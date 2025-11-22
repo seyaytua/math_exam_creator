@@ -537,8 +537,9 @@ class MainWindow(QMainWindow):
                     if script['description']:
                         script_action.setToolTip(script['description'])
                     script_action.script_data = script
+                    # クロージャの問題を避けるため、デフォルト引数で値を固定
                     script_action.triggered.connect(
-                        lambda checked=False, s=script: self.execute_external_script(s)
+                        lambda checked=False, s=dict(script): self.execute_external_script(s)
                     )
                     
                     # セパレータの後に挿入
@@ -582,8 +583,9 @@ class MainWindow(QMainWindow):
                 script_action = QAction(f"{script['name']}", self)
                 if script['description']:
                     script_action.setToolTip(script['description'])
+                # クロージャの問題を避けるため、デフォルト引数で値を固定
                 script_action.triggered.connect(
-                    lambda checked=False, s=script: self.execute_external_script(s)
+                    lambda checked=False, s=dict(script): self.execute_external_script(s)
                 )
                 self.script_menu.addAction(script_action)
             
@@ -672,7 +674,7 @@ class MainWindow(QMainWindow):
                 [python_path, script_path],
                 capture_output=True,
                 text=True,
-                timeout=60,  # 60秒タイムアウト
+                # timeout: なし - スクリプトが完了するまで待機
                 cwd=Path(script_path).parent,
                 startupinfo=startupinfo,
                 creationflags=creationflags,
@@ -695,14 +697,6 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(f"スクリプト実行完了: {name}")
             else:
                 self.statusBar().showMessage(f"スクリプト実行エラー: {name} (終了コード: {result.returncode})")
-        
-        except subprocess.TimeoutExpired:
-            QMessageBox.warning(
-                self, "タイムアウト",
-                f"スクリプトの実行がタイムアウトしました（60秒）。\n\n"
-                f"スクリプト: {name}"
-            )
-            self.statusBar().showMessage("スクリプト実行タイムアウト")
         
         except Exception as e:
             QMessageBox.critical(
