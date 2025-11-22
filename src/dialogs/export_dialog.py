@@ -40,18 +40,29 @@ class ExportDialog(QDialog):
         
         # PDF出力の利用可能性をチェック
         from ..exporters import PDFExporter
-        pdf_exporter = PDFExporter()
-        available, library = pdf_exporter.is_available()
         
-        if not available:
+        if PDFExporter is None:
+            # PDFExporterが全くインポートできない場合
             self.pdf_radio.setEnabled(False)
-            pdf_note = QLabel("※ PDF出力には weasyprint または xhtml2pdf のインストールが必要です")
+            pdf_note = QLabel("※ PDF出力には weasyprint のインストールが必要です\n"
+                            "  macOS: brew install cairo pango gdk-pixbuf libffi")
             pdf_note.setStyleSheet("color: #ff6600; font-size: 10pt; margin-left: 20px;")
+            pdf_note.setWordWrap(True)
             format_layout.addWidget(pdf_note)
         else:
-            pdf_note = QLabel(f"※ PDF出力エンジン: {library}")
-            pdf_note.setStyleSheet("color: #4caf50; font-size: 10pt; margin-left: 20px;")
-            format_layout.addWidget(pdf_note)
+            # PDFExporterがインポートできた場合、詳細チェック
+            pdf_exporter = PDFExporter()
+            available, library = pdf_exporter.is_available()
+            
+            if not available:
+                self.pdf_radio.setEnabled(False)
+                pdf_note = QLabel("※ PDF出力には weasyprint または xhtml2pdf のインストールが必要です")
+                pdf_note.setStyleSheet("color: #ff6600; font-size: 10pt; margin-left: 20px;")
+                format_layout.addWidget(pdf_note)
+            else:
+                pdf_note = QLabel(f"※ PDF出力エンジン: {library}")
+                pdf_note.setStyleSheet("color: #4caf50; font-size: 10pt; margin-left: 20px;")
+                format_layout.addWidget(pdf_note)
         
         format_group.setLayout(format_layout)
         layout.addWidget(format_group)
