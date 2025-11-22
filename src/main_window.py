@@ -29,8 +29,11 @@ class MainWindow(QMainWindow):
         self.init_ui()
         self.load_window_settings()
         self.update_window_title()
-        self.update_external_scripts_menu()
-        self.update_script_button_menu()
+        # メニューとツールバーが作成された後に外部スクリプトメニューを更新
+        # QTimer.singleShotで次のイベントループで実行
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, self.update_external_scripts_menu)
+        QTimer.singleShot(0, self.update_script_button_menu)
     
     def init_ui(self):
         """UIの初期化"""
@@ -478,15 +481,22 @@ class MainWindow(QMainWindow):
     
     def update_external_scripts_menu(self):
         """外部スクリプトメニューを更新"""
-        # ツールメニューから既存の外部スクリプト実行メニューを削除
-        menubar = self.menuBar()
-        tools_menu = None
-        for action in menubar.actions():
-            if action.text() == "ツール(&T)":
-                tools_menu = action.menu()
-                break
-        
-        if not tools_menu:
+        try:
+            # ツールメニューから既存の外部スクリプト実行メニューを削除
+            menubar = self.menuBar()
+            if not menubar:
+                return
+                
+            tools_menu = None
+            for action in menubar.actions():
+                if action.text() == "ツール(&T)":
+                    tools_menu = action.menu()
+                    break
+            
+            if not tools_menu:
+                return
+        except RuntimeError:
+            # メニューがまだ作成されていない場合
             return
         
         # 既存の外部スクリプト実行メニューを削除
@@ -539,11 +549,18 @@ class MainWindow(QMainWindow):
     
     def update_script_button_menu(self):
         """ツールバーのスクリプトボタンメニューを更新"""
-        if not hasattr(self, 'script_menu'):
+        try:
+            if not hasattr(self, 'script_menu'):
+                return
+            
+            if not self.script_menu:
+                return
+            
+            # 既存のメニュー項目をクリア
+            self.script_menu.clear()
+        except RuntimeError:
+            # メニューがまだ作成されていない場合
             return
-        
-        # 既存のメニュー項目をクリア
-        self.script_menu.clear()
         
         # 設定から外部スクリプトを読み込み
         from .config import config
