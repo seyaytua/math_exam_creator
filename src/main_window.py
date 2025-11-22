@@ -15,6 +15,7 @@ from .config import config
 from .styles import Styles
 from .widgets import ProblemEditor
 from .models import Project, Problem
+from .version import get_version, get_release_notes
 
 
 
@@ -66,7 +67,8 @@ class MainWindow(QMainWindow):
         file_menu.addAction(save_as_action)
         
         file_menu.addSeparator()
-        export_html_action = QAction("HTMLとしてエクスポート(&H)", self)
+        export_html_action = QAction("エクスポート(&E)...", self)
+        export_html_action.setShortcut(QKeySequence("Ctrl+E"))
         export_html_action.triggered.connect(self.export_html)
         file_menu.addAction(export_html_action)       
         
@@ -210,7 +212,9 @@ class MainWindow(QMainWindow):
         
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabsClosable(True)
+        self.tab_widget.setMovable(True)  # タブの並び替えを有効化
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
+        self.tab_widget.tabBar().tabMoved.connect(self.on_tab_moved)
         
         self.add_cover_tab()
         self.add_problem_tab()
@@ -253,10 +257,39 @@ class MainWindow(QMainWindow):
             self.current_project.remove_problem(index - 1)
         
         self.tab_widget.removeTab(index)
+        self._update_tab_titles()
+    
+    def on_tab_moved(self, from_index: int, to_index: int):
+        """タブが移動された時の処理"""
+        # 表紙タブ（index 0）は移動させない
+        if from_index == 0 or to_index == 0:
+            return
+        
+        # エディタリストを並び替え
+        from_editor_index = from_index - 1
+        to_editor_index = to_index - 1
+        
+        if 0 <= from_editor_index < len(self.problem_editors):
+            editor = self.problem_editors.pop(from_editor_index)
+            self.problem_editors.insert(to_editor_index, editor)
+        
+        # プロジェクトの問題リストも並び替え
+        if 0 <= from_editor_index < len(self.current_project.problems):
+            problem = self.current_project.problems.pop(from_editor_index)
+            self.current_project.problems.insert(to_editor_index, problem)
+        
+        self._update_tab_titles()
+        self.statusBar().showMessage("問題の順序を変更しました")
+    
+    def _update_tab_titles(self):
+        """タブのタイトルを更新"""
+        for i, editor in enumerate(self.problem_editors):
+            self.tab_widget.setTabText(i + 1, f"問題 {i + 1}")
     
     def update_window_title(self):
         """ウィンドウタイトルを更新"""
-        title = "Math Exam Creator"
+        version = get_version()
+        title = f"Math Exam Creator v{version}"
         if self.current_project.file_path:
             title += f" - {self.current_project.file_path.name}"
         else:
@@ -331,6 +364,8 @@ class MainWindow(QMainWindow):
                 problem_editor.set_text(problem.content)
                 if hasattr(problem, 'score'):
                     problem_editor.set_score(problem.score)
+                if hasattr(problem, 'problem_type'):
+                    problem_editor.set_problem_type(problem.problem_type)
                 self.problem_editors.append(problem_editor)
                 self.tab_widget.addTab(problem_editor, f"問題 {i + 1}")
             
@@ -373,6 +408,7 @@ class MainWindow(QMainWindow):
                 if i < len(self.current_project.problems):
                     self.current_project.problems[i].content = editor.get_text()
                     self.current_project.problems[i].score = editor.get_score()
+                    self.current_project.problems[i].problem_type = editor.get_problem_type()
             
             self.current_project.save(self.current_project.file_path)
             self.update_window_title()
@@ -423,12 +459,19 @@ class MainWindow(QMainWindow):
     
     def show_about(self):
         """アプリケーション情報を表示"""
+        version = get_version()
+        release_notes = get_release_notes(version)
+        notes_html = "<ul>" + "".join([f"<li>{note}</li>" for note in release_notes[:5]]) + "</ul>"
+        
         QMessageBox.about(
             self,
             "Math Exam Creatorについて",
-            "<h3>Math Exam Creator</h3>"
-            "<p>バージョン: 1.0.0</p>"
-            "<p>数学考査作成支援アプリケーション</p>"
+            f"<h3>Math Exam Creator</h3>"
+            f"<p><b>バージョン: {version}</b></p>"
+            f"<p>数学考査作成支援アプリケーション</p>"
+            f"<hr>"
+            f"<p><b>主な機能:</b></p>"
+            f"{notes_html}"
         )
     
     def load_window_settings(self):
@@ -448,9 +491,9 @@ class MainWindow(QMainWindow):
         event.accept()
 
     def export_html(self):
-        """HTMLとしてエクスポート"""
+        """HTMLまたはPDFとしてエクスポート"""
         from .dialogs import ExportDialog
-        from .exporters import HTMLExporter
+        from .exporters import HTMLExporter, PDFExporter
         
         # エクスポート設定ダイアログを表示
         dialog = ExportDialog(self)
@@ -458,17 +501,27 @@ class MainWindow(QMainWindow):
             return
         
         options = dialog.get_options()
+        export_format = options.get('format', 'html')
         
         # 表紙データを追加
         cover_data = self.cover_editor.get_cover_data()
         options.update(cover_data)
         
         # 保存先を選択
+        if export_format == 'pdf':
+            file_filter = "PDF Files (*.pdf);;All Files (*)"
+            default_name = f"{self.current_project.title}.pdf"
+            dialog_title = "PDFとしてエクスポート"
+        else:
+            file_filter = "HTML Files (*.html);;All Files (*)"
+            default_name = f"{self.current_project.title}.html"
+            dialog_title = "HTMLとしてエクスポート"
+        
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "HTMLとしてエクスポート",
-            str(Path.home() / f"{self.current_project.title}.html"),
-            "HTML Files (*.html);;All Files (*)"
+            dialog_title,
+            str(Path.home() / default_name),
+            file_filter
         )
         
         if not file_path:
@@ -480,27 +533,52 @@ class MainWindow(QMainWindow):
                 if i < len(self.current_project.problems):
                     self.current_project.problems[i].content = editor.get_text()
                     self.current_project.problems[i].score = editor.get_score()
+                    self.current_project.problems[i].problem_type = editor.get_problem_type()
             
             # 表紙データをプロジェクトに保存（JSON形式）
             self.current_project.cover_content = json.dumps(cover_data, ensure_ascii=False)
             
-            # HTMLエクスポート
-            exporter = HTMLExporter()
-            exporter.export(self.current_project, Path(file_path), options)
-            
-            self.statusBar().showMessage(f"HTMLファイルを出力しました: {Path(file_path).name}")
-            
-            # 確認ダイアログ
-            reply = QMessageBox.question(
-                self, "エクスポート完了",
-                "HTMLファイルを出力しました。\n開きますか？",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            
-            if reply == QMessageBox.Yes:
-                import webbrowser
-                webbrowser.open(file_path)
+            # エクスポート
+            if export_format == 'pdf':
+                exporter = PDFExporter()
+                exporter.export(self.current_project, Path(file_path), options)
+                self.statusBar().showMessage(f"PDFファイルを出力しました: {Path(file_path).name}")
+                
+                # 確認ダイアログ
+                reply = QMessageBox.question(
+                    self, "エクスポート完了",
+                    "PDFファイルを出力しました。\n開きますか？",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                
+                if reply == QMessageBox.Yes:
+                    import webbrowser
+                    webbrowser.open(str(file_path))
+            else:
+                exporter = HTMLExporter()
+                exporter.export(self.current_project, Path(file_path), options)
+                self.statusBar().showMessage(f"HTMLファイルを出力しました: {Path(file_path).name}")
+                
+                # 確認ダイアログ
+                reply = QMessageBox.question(
+                    self, "エクスポート完了",
+                    "HTMLファイルを出力しました。\n開きますか？",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                
+                if reply == QMessageBox.Yes:
+                    import webbrowser
+                    webbrowser.open(file_path)
         
+        except ImportError as e:
+            QMessageBox.warning(
+                self, "PDF出力エラー",
+                f"PDF出力には追加のライブラリが必要です:\n\n{str(e)}\n\n"
+                "以下のコマンドでインストールしてください:\n"
+                "  pip install weasyprint\n"
+                "または\n"
+                "  pip install xhtml2pdf"
+            )
         except Exception as e:
             QMessageBox.critical(
                 self, "エラー",

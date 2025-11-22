@@ -3,7 +3,8 @@
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QTextEdit, QLabel, QPushButton, QToolBar, QLineEdit, QFormLayout
+    QTextEdit, QLabel, QPushButton, QToolBar, QLineEdit, QFormLayout,
+    QRadioButton, QButtonGroup
 )
 from PySide6.QtCore import Qt, Signal, QTimer, QUrl
 from PySide6.QtGui import QFont, QTextOption, QAction, QTextCursor
@@ -17,6 +18,7 @@ class ProblemEditor(QWidget):
     
     text_changed = Signal(str)
     score_changed = Signal(str)
+    type_changed = Signal(str)
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -35,19 +37,40 @@ class ProblemEditor(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # 配点入力フィールドを追加
-        score_layout = QHBoxLayout()
-        score_layout.setContentsMargins(10, 5, 10, 5)
+        # 問題設定エリア
+        settings_layout = QHBoxLayout()
+        settings_layout.setContentsMargins(10, 5, 10, 5)
+        
+        # 配点入力フィールド
         score_label = QLabel("配点:")
         score_label.setStyleSheet("font-weight: bold;")
         self.score_edit = QLineEdit()
         self.score_edit.setPlaceholderText("例: 15 または 15点")
         self.score_edit.setMaximumWidth(150)
         self.score_edit.textChanged.connect(self.score_changed.emit)
-        score_layout.addWidget(score_label)
-        score_layout.addWidget(self.score_edit)
-        score_layout.addStretch()
-        layout.addLayout(score_layout)
+        settings_layout.addWidget(score_label)
+        settings_layout.addWidget(self.score_edit)
+        
+        settings_layout.addSpacing(20)
+        
+        # 必答・選択の区別
+        type_label = QLabel("区分:")
+        type_label.setStyleSheet("font-weight: bold;")
+        settings_layout.addWidget(type_label)
+        
+        self.required_radio = QRadioButton("必答問題")
+        self.required_radio.setChecked(True)
+        self.optional_radio = QRadioButton("選択問題")
+        
+        self.type_button_group = QButtonGroup()
+        self.type_button_group.addButton(self.required_radio, 0)
+        self.type_button_group.addButton(self.optional_radio, 1)
+        self.type_button_group.buttonClicked.connect(self._on_type_changed)
+        
+        settings_layout.addWidget(self.required_radio)
+        settings_layout.addWidget(self.optional_radio)
+        settings_layout.addStretch()
+        layout.addLayout(settings_layout)
         
         self.create_toolbar(layout)
         
@@ -125,6 +148,12 @@ class ProblemEditor(QWidget):
         numbered_list_action = QAction("番号付きリスト", self)
         numbered_list_action.triggered.connect(lambda: self.insert_markdown("1. ", ""))
         toolbar.addAction(numbered_list_action)
+        
+        toolbar.addSeparator()
+        
+        image_action = QAction("画像を挿入", self)
+        image_action.triggered.connect(self.insert_image)
+        toolbar.addAction(image_action)
         
         parent_layout.addWidget(toolbar)
     
@@ -320,3 +349,30 @@ class ProblemEditor(QWidget):
     def set_score(self, score: str):
         """配点を設定"""
         self.score_edit.setText(score)
+    
+    def get_problem_type(self) -> str:
+        """問題タイプを取得"""
+        return "required" if self.required_radio.isChecked() else "optional"
+    
+    def set_problem_type(self, problem_type: str):
+        """問題タイプを設定"""
+        if problem_type == "optional":
+            self.optional_radio.setChecked(True)
+        else:
+            self.required_radio.setChecked(True)
+    
+    def _on_type_changed(self):
+        """問題タイプ変更時の処理"""
+        self.type_changed.emit(self.get_problem_type())
+    
+    def insert_image(self):
+        """画像を挿入"""
+        from ..dialogs import ImageInsertDialog
+        
+        dialog = ImageInsertDialog(self)
+        if dialog.exec():
+            image_markdown = dialog.get_image_markdown()
+            if image_markdown:
+                cursor = self.text_editor.textCursor()
+                cursor.insertText("\n" + image_markdown + "\n")
+                self.text_editor.setFocus()

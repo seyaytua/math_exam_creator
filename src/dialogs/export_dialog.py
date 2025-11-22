@@ -34,13 +34,24 @@ class ExportDialog(QDialog):
         format_layout.addWidget(self.html_radio)
         
         self.pdf_radio = QRadioButton("PDF（直接印刷可能）")
-        self.pdf_radio.setEnabled(False)
+        self.pdf_radio.setEnabled(True)
         self.format_button_group.addButton(self.pdf_radio, 1)
         format_layout.addWidget(self.pdf_radio)
         
-        pdf_note = QLabel("※ PDF出力は今後実装予定です")
-        pdf_note.setStyleSheet("color: #999; font-size: 10pt; margin-left: 20px;")
-        format_layout.addWidget(pdf_note)
+        # PDF出力の利用可能性をチェック
+        from ..exporters import PDFExporter
+        pdf_exporter = PDFExporter()
+        available, library = pdf_exporter.is_available()
+        
+        if not available:
+            self.pdf_radio.setEnabled(False)
+            pdf_note = QLabel("※ PDF出力には weasyprint または xhtml2pdf のインストールが必要です")
+            pdf_note.setStyleSheet("color: #ff6600; font-size: 10pt; margin-left: 20px;")
+            format_layout.addWidget(pdf_note)
+        else:
+            pdf_note = QLabel(f"※ PDF出力エンジン: {library}")
+            pdf_note.setStyleSheet("color: #4caf50; font-size: 10pt; margin-left: 20px;")
+            format_layout.addWidget(pdf_note)
         
         format_group.setLayout(format_layout)
         layout.addWidget(format_group)
@@ -80,11 +91,20 @@ class ExportDialog(QDialog):
         
         self.show_answers_check = QCheckBox("解答を表示")
         self.show_answers_check.setChecked(False)
+        self.show_answers_check.setEnabled(False)
         content_layout.addWidget(self.show_answers_check)
         
         answer_note = QLabel("※ 解答表示機能は今後実装予定です")
         answer_note.setStyleSheet("color: #999; font-size: 10pt; margin-left: 20px;")
         content_layout.addWidget(answer_note)
+        
+        self.generate_answer_sheet_check = QCheckBox("解答用紙を自動生成")
+        self.generate_answer_sheet_check.setChecked(True)
+        content_layout.addWidget(self.generate_answer_sheet_check)
+        
+        answer_sheet_note = QLabel("※ 問題文から空欄（ア、イ、ウ等）を抽出して解答用紙を生成します")
+        answer_sheet_note.setStyleSheet("color: #666; font-size: 10pt; margin-left: 20px;")
+        content_layout.addWidget(answer_sheet_note)
         
         content_group.setLayout(content_layout)
         layout.addWidget(content_group)
@@ -163,6 +183,7 @@ class ExportDialog(QDialog):
             'show_cover': self.show_cover_check.isChecked(),
             'show_problem_numbers': self.show_problem_numbers_check.isChecked(),
             'show_answers': self.show_answers_check.isChecked(),
+            'generate_answer_sheet': self.generate_answer_sheet_check.isChecked(),
             'font_size': self.font_size_spin.value(),
             'line_spacing': line_spacing,
             'margin': margin

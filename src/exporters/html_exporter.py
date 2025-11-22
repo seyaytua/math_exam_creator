@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List
 from datetime import datetime
 from ..models import Project, Problem
-from ..utils import MarkdownRenderer
+from ..utils import MarkdownRenderer, AnswerSheetGenerator
 
 
 class HTMLExporter:
@@ -12,6 +12,7 @@ class HTMLExporter:
     
     def __init__(self):
         self.renderer = MarkdownRenderer()
+        self.answer_generator = AnswerSheetGenerator()
     
     def export(self, project: Project, output_path: Path, options: dict = None):
         """プロジェクトをHTMLファイルとして出力"""
@@ -27,7 +28,15 @@ class HTMLExporter:
         """HTML生成"""
         cover_html = self._generate_cover(project, options)
         problems_html = self._generate_problems(project.problems, options)
-        return self._wrap_document(cover_html, problems_html, project, options)
+        
+        # 解答用紙を生成（オプションで有効な場合）
+        answer_sheet_html = ''
+        if options.get('generate_answer_sheet', False):
+            answer_sheet_html = self.answer_generator.generate_answer_sheet_html(
+                project.problems, options
+            )
+        
+        return self._wrap_document(cover_html, problems_html, answer_sheet_html, project, options)
     
     def _generate_cover(self, project: Project, options: dict) -> str:
         """表紙生成"""
@@ -116,10 +125,18 @@ class HTMLExporter:
                 if hasattr(problem_obj, 'score') and problem_obj.score:
                     score_display = f'（配点　{problem_obj.score}）'
                 
+                # 必答・選択の区別
+                problem_type_display = ''
+                if hasattr(problem_obj, 'problem_type'):
+                    if problem_obj.problem_type == 'required':
+                        problem_type_display = '（必答問題）'
+                    elif problem_obj.problem_type == 'optional':
+                        problem_type_display = '（選択問題）'
+                
                 problems_html += f'''
                 <div class="problem-container">
                     <div class="problem-header">
-                        <h2 class="problem-title">{problem_title}</h2>
+                        <h2 class="problem-title">{problem_title} {problem_type_display}</h2>
                         {f'<span class="problem-score">{score_display}</span>' if score_display else ''}
                     </div>
                     <div class="problem-content">
@@ -144,7 +161,7 @@ class HTMLExporter:
         return problems_html
     
     def _wrap_document(self, cover_html: str, problems_html: str, 
-                       project: Project, options: dict) -> str:
+                       answer_sheet_html: str, project: Project, options: dict) -> str:
         """完全なHTMLドキュメントを生成"""
         font_size = options.get('font_size', 12)
         line_spacing = options.get('line_spacing', 1.8)
@@ -397,13 +414,23 @@ class HTMLExporter:
         
         /* 数式スタイル */
         .math-display {{
-            margin: 2em 0;
+            margin: 1.5em 0;
             text-align: center;
             overflow-x: auto;
         }}
         
         .math-inline {{
             display: inline;
+            vertical-align: middle;
+        }}
+        
+        /* MathJax出力の調整 */
+        .MathJax {{
+            font-size: 110% !important;
+        }}
+        
+        mjx-container[display="true"] {{
+            margin: 1.5em 0 !important;
         }}
         
         /* ページ区切り */
@@ -422,10 +449,13 @@ class HTMLExporter:
                 padding: 20mm 15mm;
             }}
         }}
+        
+        {self.answer_generator.get_answer_sheet_styles() if answer_sheet_html else ''}
     </style>
 </head>
 <body>
     {cover_html}
     {problems_html}
+    {answer_sheet_html}
 </body>
 </html>'''

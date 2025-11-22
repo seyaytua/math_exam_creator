@@ -88,6 +88,12 @@ class HTMLEditor(QWidget):
         table_action.triggered.connect(self.insert_table)
         toolbar.addAction(table_action)
         
+        toolbar.addSeparator()
+        
+        image_action = QAction("画像を挿入", self)
+        image_action.triggered.connect(self.insert_image)
+        toolbar.addAction(image_action)
+        
         parent_layout.addWidget(toolbar)
     
     def create_editor(self) -> QWidget:
@@ -312,3 +318,15 @@ class HTMLEditor(QWidget):
     def set_text(self, text: str):
         """エディタのテキストを設定"""
         self.text_editor.setPlainText(text)
+    
+    def insert_image(self):
+        """画像を挿入"""
+        from ..dialogs import ImageInsertDialog
+        
+        dialog = ImageInsertDialog(self)
+        if dialog.exec():
+            image_html = dialog.get_image_html()
+            if image_html:
+                cursor = self.text_editor.textCursor()
+                cursor.insertText("\n" + image_html + "\n")
+                self.text_editor.setFocus()
