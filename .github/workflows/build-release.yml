@@ -1,124 +1,195 @@
+# GitHub Actions ワークフローの設定方法
+
+GitHub Actionsで自動ビルドを設定するための手順です。
+
+## なぜ手動設定が必要か
+
+GitHub Appの権限制限により、ワークフローファイル（`.github/workflows/`）を直接プッシュできません。
+そのため、GitHub Web UIから手動で追加する必要があります。
+
+## 設定手順
+
+### 1. GitHubリポジトリを開く
+
+1. https://github.com/seyaytua/math_exam_creator にアクセス
+2. `genspark_ai_developer` ブランチに切り替え
+
+### 2. ワークフローファイルを作成
+
+1. リポジトリのルートで「Add file」→「Create new file」をクリック
+2. ファイル名を入力: `.github/workflows/build-release.yml`
+3. 以下の内容をコピー＆ペースト
+
+### 3. ワークフローファイルの内容
+
 ```yaml
-# GITHUB_ACTIONS_SETUP.mdから完全なYAMLをコピー
+name: Build Release Executables
+
+on:
+  push:
+    tags:
+      - 'v*'  # v1.0.0, v1.1.0 などのタグでトリガー
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  build-macos:
+    name: Build macOS App
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install system dependencies (macOS)
+      run: |
+        brew install cairo pango gdk-pixbuf libffi
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        pip install weasyprint
+    
+    - name: Build macOS app with PyInstaller
+      run: |
+        pyinstaller build.spec --clean
+    
+    - name: Create ZIP archive
+      run: |
+        cd dist
+        zip -r "Math-Exam-Creator-macOS.zip" "Math Exam Creator.app"
+    
+    - name: Upload macOS artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-app
+        path: dist/Math-Exam-Creator-macOS.zip
+        retention-days: 30
+
+  build-windows:
+    name: Build Windows Executable
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        pip install xhtml2pdf
+    
+    - name: Build Windows executable with PyInstaller
+      run: |
+        pyinstaller build.spec --clean
+    
+    - name: Create ZIP archive
+      run: |
+        Compress-Archive -Path "dist\MathExamCreator" -DestinationPath "dist\Math-Exam-Creator-Windows.zip"
+    
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-exe
+        path: dist/Math-Exam-Creator-Windows.zip
+        retention-days: 30
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Download macOS artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: macos-app
+        path: ./artifacts
+    
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: windows-exe
+        path: ./artifacts
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          ./artifacts/Math-Exam-Creator-macOS.zip
+          ./artifacts/Math-Exam-Creator-Windows.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-6. 「Commit new file」をクリック
+### 4. コミット
 
-#### ステップ2: 手動ビルドを実行
+1. 下部の「Commit new file」をクリック
+2. Commit message: `ci: add GitHub Actions workflow for building executables`
+3. 「Commit directly to the genspark_ai_developer branch」を選択
+4. 「Commit new file」をクリック
 
-1. GitHubの「Actions」タブを開く
-2. 「Build Release Executables」ワークフローを選択
-3. 「Run workflow」→ブランチ選択（genspark_ai_developer）→「Run workflow」
-4. 完了を待つ（約10-15分）
-5. Artifactsセクションから以下をダウンロード:
-   - `macos-app` (Math-Exam-Creator-macOS.zip)
-   - `windows-exe` (Math-Exam-Creator-Windows.zip)
+## 使い方
 
-### 方法2: ローカルビルド
-
-#### macOSでビルド
+### 自動ビルド（タグプッシュ）
 
 ```bash
-cd /Users/syuta/Downloads/math_exam_creator-main
-./build_macos.sh
-```
-
-完了後: `dist/Math Exam Creator.app` が作成されます
-
-#### Windowsでビルド
-
-```cmd
-cd math_exam_creator-main
-build_windows.bat
-```
-
-完了後: `dist\MathExamCreator\MathExamCreator.exe` が作成されます
-
-## リリースの作成
-
-### バージョンタグをプッシュ
-
-```bash
-# 最新の変更を取得
-git fetch origin
-git checkout genspark_ai_developer
-git pull origin genspark_ai_developer
-
-# タグを作成
-git tag v1.1.0 -m "Release version 1.1.0"
+# バージョンタグを作成
+git tag v1.1.0
 
 # タグをプッシュ
 git push origin v1.1.0
 ```
 
-これでGitHub Actionsが自動的に実行され、以下が作成されます:
-- macOS用アプリケーション
-- Windows用実行ファイル  
-- GitHub Release（自動作成）
+GitHub Actionsが自動的に実行され、macOSとWindows用のビルドが作成されます。
+完了後、GitHub Releaseが自動作成されます。
 
-## 配布方法
+### 手動ビルド
 
-### 作成されるファイル
+1. GitHubリポジトリの「Actions」タブを開く
+2. 「Build Release Executables」ワークフローを選択
+3. 「Run workflow」ボタンをクリック
+4. ブランチを選択（通常は `genspark_ai_developer`）
+5. 「Run workflow」をクリック
 
-- `Math-Exam-Creator-macOS.zip` (約50-80MB)
-  - 解凍すると `Math Exam Creator.app`
-  - アプリケーションフォルダにドラッグ＆ドロップで使用可能
-
-- `Math-Exam-Creator-Windows.zip` (約30-50MB)
-  - 解凍すると `MathExamCreator` フォルダ
-  - フォルダ内の `MathExamCreator.exe` を実行
-
-### ユーザーへの配布
-
-1. **GitHub Releaseから配布（推奨）**
-   - タグをプッシュすると自動作成
-   - https://github.com/seyaytua/math_exam_creator/releases
-   - ユーザーはダウンロード＆解凍するだけ
-
-2. **直接配布**
-   - ZIPファイルをメール/クラウドストレージで配布
-   - README.mdの使用方法を含める
+ビルド完了後、「Artifacts」セクションからZIPファイルをダウンロードできます。
 
 ## トラブルシューティング
 
-### macOS: 「開発元が未確認」エラー
+### ワークフローが実行されない
 
-初回起動時に表示される場合:
-```bash
-xattr -cr "Math Exam Creator.app"
-```
-
-または、右クリック→「開く」で起動
-
-### Windows: 「保護されました」エラー
-
-「詳細情報」→「実行」をクリック
+- リポジトリの「Settings」→「Actions」→「General」で、
+  「Allow all actions and reusable workflows」が有効になっているか確認
 
 ### ビルドが失敗する
 
-- Python 3.11以上がインストールされているか確認
-- 依存関係がすべてインストールされているか確認
-- `build.spec` の設定を確認
+- 「Actions」タブからワークフロー実行結果を確認
+- エラーログを確認して、不足している依存関係がないかチェック
 
-## 次にやること
+### Releaseが作成されない
 
-1. ✅ ワークフローファイルをGitHubに追加
-2. ✅ GitHub Actionsで手動ビルドを実行してテスト
-3. ✅ 成功したらタグをプッシュしてリリース作成
-4. 📱 アイコンを追加（オプション）:
-   - `resources/icon.icns`（macOS用）
-   - `resources/icon.ico`（Windows用）
+- タグが `v` で始まっているか確認（例: `v1.0.0`）
+- `create-release` ジョブが実行されているか確認
 
-## サポートドキュメント
+## 参考情報
 
-- [BUILD.md](BUILD.md) - 詳細なビルド手順
-- [GITHUB_ACTIONS_SETUP.md](GITHUB_ACTIONS_SETUP.md) - GitHub Actions設定
-- [README.md](README.md) - ユーザー向け使用方法
-
-## 現在の状態
-
-- ✅ ソースコード完成
-- ✅ ビルドシステム構築
-- ✅ ドキュメント作成
-- ⏳ GitHub Actionsワークフロー追加待ち
-- ⏳ 実機ビルド待ち
+- [GitHub Actions ドキュメント](https://docs.github.com/en/actions)
+- [PyInstaller ドキュメント](https://pyinstaller.org/en/stable/)
+- [BUILD.md](BUILD.md) - ローカルビルド手順
