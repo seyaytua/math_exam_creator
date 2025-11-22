@@ -10,9 +10,10 @@ from datetime import datetime
 class Problem:
     """問題データクラス"""
     
-    def __init__(self, title: str = "", content: str = ""):
+    def __init__(self, title: str = "", content: str = "", score: str = ""):
         self.title = title
         self.content = content
+        self.score = score  # 配点（例: "15", "20点"）
         self.created_at = datetime.now().isoformat()
         self.updated_at = datetime.now().isoformat()
     
@@ -21,6 +22,7 @@ class Problem:
         return {
             "title": self.title,
             "content": self.content,
+            "score": self.score,
             "created_at": self.created_at,
             "updated_at": self.updated_at
         }
@@ -28,7 +30,11 @@ class Problem:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Problem':
         """辞書から生成"""
-        problem = cls(data.get("title", ""), data.get("content", ""))
+        problem = cls(
+            data.get("title", ""), 
+            data.get("content", ""),
+            data.get("score", "")
+        )
         problem.created_at = data.get("created_at", datetime.now().isoformat())
         problem.updated_at = data.get("updated_at", datetime.now().isoformat())
         return problem

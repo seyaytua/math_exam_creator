@@ -87,6 +87,9 @@ class HTMLExporter:
         show_problem_numbers = options.get('show_problem_numbers', True)
         problems_per_page = options.get('problems_per_page', 1)
         
+        # 日本語の問題番号変換
+        japanese_numbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+        
         for i, problem in enumerate(problems, 1):
             problem_html = self.renderer.render(problem.content)
             
@@ -101,9 +104,24 @@ class HTMLExporter:
                 problems_html += '<div class="problem-page">'
             
             if show_problem_numbers:
+                # 日本語の問題番号を生成
+                if i <= len(japanese_numbers):
+                    problem_title = f'第{japanese_numbers[i-1]}問'
+                else:
+                    problem_title = f'第{i}問'
+                
+                # 問題タイトルから配点を抽出（Problem.titleに格納されている場合）
+                problem_obj = problems[i-1]
+                score_display = ''
+                if hasattr(problem_obj, 'score') and problem_obj.score:
+                    score_display = f'（配点　{problem_obj.score}）'
+                
                 problems_html += f'''
                 <div class="problem-container">
-                    <div class="problem-number">{i}</div>
+                    <div class="problem-header">
+                        <h2 class="problem-title">{problem_title}</h2>
+                        {f'<span class="problem-score">{score_display}</span>' if score_display else ''}
+                    </div>
                     <div class="problem-content">
                         {problem_content}
                     </div>
@@ -283,22 +301,30 @@ class HTMLExporter:
         }}
         
         .problem-container {{
-            margin-bottom: 40px;
+            margin-bottom: 50px;
         }}
         
-        .problem-number {{
-            font-size: 16pt;
+        .problem-header {{
+            margin-bottom: 20px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }}
+        
+        .problem-title {{
+            font-size: 18pt;
             font-weight: bold;
-            margin-bottom: 15px;
-            padding: 8px 15px;
-            border: 2px solid #000;
             display: inline-block;
-            min-width: 60px;
-            text-align: center;
+            margin: 0;
+            padding: 0;
+        }}
+        
+        .problem-score {{
+            font-size: 12pt;
+            margin-left: 20px;
         }}
         
         .problem-content {{
-            padding: 15px 5px;
+            padding: 20px 5px;
         }}
         
         /* マークダウンコンテンツスタイル */

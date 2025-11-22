@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QAction, QKeySequence
 from pathlib import Path
+import json
 
 from .config import config
 from .styles import Styles
@@ -315,10 +316,21 @@ class MainWindow(QMainWindow):
             # 表紙を追加
             self.add_cover_tab()
             
+            # 表紙データを復元
+            if self.current_project.cover_content:
+                try:
+                    cover_data = json.loads(self.current_project.cover_content)
+                    self.cover_editor.set_cover_data(cover_data)
+                except (json.JSONDecodeError, TypeError):
+                    # 旧形式や不正なデータの場合は無視
+                    pass
+            
             # 問題を読み込み
             for i, problem in enumerate(self.current_project.problems):
                 problem_editor = ProblemEditor()
                 problem_editor.set_text(problem.content)
+                if hasattr(problem, 'score'):
+                    problem_editor.set_score(problem.score)
                 self.problem_editors.append(problem_editor)
                 self.tab_widget.addTab(problem_editor, f"問題 {i + 1}")
             
@@ -360,6 +372,7 @@ class MainWindow(QMainWindow):
             for i, editor in enumerate(self.problem_editors):
                 if i < len(self.current_project.problems):
                     self.current_project.problems[i].content = editor.get_text()
+                    self.current_project.problems[i].score = editor.get_score()
             
             self.current_project.save(self.current_project.file_path)
             self.update_window_title()
@@ -466,9 +479,10 @@ class MainWindow(QMainWindow):
             for i, editor in enumerate(self.problem_editors):
                 if i < len(self.current_project.problems):
                     self.current_project.problems[i].content = editor.get_text()
+                    self.current_project.problems[i].score = editor.get_score()
             
-            # 表紙データをプロジェクトに保存
-            self.current_project.cover_content = str(cover_data)
+            # 表紙データをプロジェクトに保存（JSON形式）
+            self.current_project.cover_content = json.dumps(cover_data, ensure_ascii=False)
             
             # HTMLエクスポート
             exporter = HTMLExporter()
@@ -486,12 +500,6 @@ class MainWindow(QMainWindow):
             if reply == QMessageBox.Yes:
                 import webbrowser
                 webbrowser.open(file_path)
-        
-        except Exception as e:
-            QMessageBox.critical(
-                self, "エラー",
-                f"エクスポートに失敗しました:\n{str(e)}"
-            )
         
         except Exception as e:
             QMessageBox.critical(

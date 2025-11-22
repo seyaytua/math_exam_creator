@@ -3,7 +3,7 @@
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QTextEdit, QLabel, QPushButton, QToolBar
+    QTextEdit, QLabel, QPushButton, QToolBar, QLineEdit, QFormLayout
 )
 from PySide6.QtCore import Qt, Signal, QTimer, QUrl
 from PySide6.QtGui import QFont, QTextOption, QAction, QTextCursor
@@ -16,6 +16,7 @@ class ProblemEditor(QWidget):
     """問題編集ウィジェット"""
     
     text_changed = Signal(str)
+    score_changed = Signal(str)
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -33,6 +34,20 @@ class ProblemEditor(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        
+        # 配点入力フィールドを追加
+        score_layout = QHBoxLayout()
+        score_layout.setContentsMargins(10, 5, 10, 5)
+        score_label = QLabel("配点:")
+        score_label.setStyleSheet("font-weight: bold;")
+        self.score_edit = QLineEdit()
+        self.score_edit.setPlaceholderText("例: 15 または 15点")
+        self.score_edit.setMaximumWidth(150)
+        self.score_edit.textChanged.connect(self.score_changed.emit)
+        score_layout.addWidget(score_label)
+        score_layout.addWidget(self.score_edit)
+        score_layout.addStretch()
+        layout.addLayout(score_layout)
         
         self.create_toolbar(layout)
         
@@ -297,3 +312,11 @@ class ProblemEditor(QWidget):
     def set_text(self, text: str):
         """エディタのテキストを設定"""
         self.text_editor.setPlainText(text)
+    
+    def get_score(self) -> str:
+        """配点を取得"""
+        return self.score_edit.text()
+    
+    def set_score(self, score: str):
+        """配点を設定"""
+        self.score_edit.setText(score)

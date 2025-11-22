@@ -198,7 +198,7 @@ class PromptGeneratorDialog(QDialog):
     
     def _generate_markdown_prompt(self, topic, grade, difficulty, count, format_text, additional):
         """Markdown形式のプロンプトを生成"""
-        prompt = f"""# 数学問題作成依頼
+        prompt = rf"""# 数学問題作成依頼
 
 以下の条件に従って、数学の問題を作成してください。
 
@@ -266,7 +266,7 @@ LaTeX記法
 
     def _generate_html_prompt(self, topic, grade, difficulty, count, format_text, additional):
         """HTML形式のプロンプトを生成"""
-        prompt = f"""# 数学問題作成依頼（HTML形式）
+        prompt = rf"""# 数学問題作成依頼（HTML形式）
 
 以下の条件に従って、数学の問題を作成してください。
 
