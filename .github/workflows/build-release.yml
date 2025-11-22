@@ -3,8 +3,8 @@ name: Build Release Executables
 on:
   push:
     tags:
-      - 'v*'  # v1.0.0, v1.1.0 などのタグでトリガー
-  workflow_dispatch:  # 手動実行も可能
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build-macos:
@@ -20,7 +20,7 @@ jobs:
       with:
         python-version: '3.11'
     
-    - name: Install system dependencies (macOS)
+    - name: Install system dependencies
       run: |
         brew install cairo pango gdk-pixbuf libffi
     
@@ -28,10 +28,9 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pyinstaller
-        pip install weasyprint
+        pip install pyinstaller weasyprint
     
-    - name: Build macOS app with PyInstaller
+    - name: Build macOS app
       run: |
         pyinstaller build.spec --clean
     
@@ -40,12 +39,11 @@ jobs:
         cd dist
         zip -r "Math-Exam-Creator-macOS.zip" "Math Exam Creator.app"
     
-    - name: Upload macOS artifact
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: macos-app
         path: dist/Math-Exam-Creator-macOS.zip
-        retention-days: 30
 
   build-windows:
     name: Build Windows Executable
@@ -64,10 +62,9 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pyinstaller
-        pip install xhtml2pdf
+        pip install pyinstaller xhtml2pdf
     
-    - name: Build Windows executable with PyInstaller
+    - name: Build Windows executable
       run: |
         pyinstaller build.spec --clean
     
@@ -75,40 +72,8 @@ jobs:
       run: |
         Compress-Archive -Path "dist\MathExamCreator" -DestinationPath "dist\Math-Exam-Creator-Windows.zip"
     
-    - name: Upload Windows artifact
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: windows-exe
         path: dist/Math-Exam-Creator-Windows.zip
-        retention-days: 30
-
-  create-release:
-    name: Create GitHub Release
-    needs: [build-macos, build-windows]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    
-    steps:
-    - name: Download macOS artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: macos-app
-        path: ./artifacts
-    
-    - name: Download Windows artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: windows-exe
-        path: ./artifacts
-    
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          ./artifacts/Math-Exam-Creator-macOS.zip
-          ./artifacts/Math-Exam-Creator-Windows.zip
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
