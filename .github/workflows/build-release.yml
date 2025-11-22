@@ -1,0 +1,79 @@
+name: Build Release Executables
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    name: Build macOS App
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install system dependencies
+      run: |
+        brew install cairo pango gdk-pixbuf libffi
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller weasyprint
+    
+    - name: Build macOS app
+      run: |
+        pyinstaller build.spec --clean
+    
+    - name: Create ZIP archive
+      run: |
+        cd dist
+        zip -r "Math-Exam-Creator-macOS.zip" "Math Exam Creator.app"
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-app
+        path: dist/Math-Exam-Creator-macOS.zip
+
+  build-windows:
+    name: Build Windows Executable
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller xhtml2pdf
+    
+    - name: Build Windows executable
+      run: |
+        pyinstaller build.spec --clean
+    
+    - name: Create ZIP archive
+      run: |
+        Compress-Archive -Path "dist\MathExamCreator" -DestinationPath "dist\Math-Exam-Creator-Windows.zip"
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-exe
+        path: dist/Math-Exam-Creator-Windows.zip

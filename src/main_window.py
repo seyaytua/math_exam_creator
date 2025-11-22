@@ -29,8 +29,11 @@ class MainWindow(QMainWindow):
         self.init_ui()
         self.load_window_settings()
         self.update_window_title()
-        self.update_external_scripts_menu()
-        self.update_script_button_menu()
+        # メニューとツールバーが作成された後に外部スクリプトメニューを更新
+        # QTimer.singleShotで次のイベントループで実行
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, self.update_external_scripts_menu)
+        QTimer.singleShot(0, self.update_script_button_menu)
     
     def init_ui(self):
         """UIの初期化"""
@@ -457,7 +460,36 @@ class MainWindow(QMainWindow):
     
     def open_math_editor(self):
         """数式エディタを開く"""
-        QMessageBox.information(self, "数式エディタ", "数式エディタは実装予定です")
+        from .dialogs import MathEditorDialog
+        
+        # 現在のタブがProblemEditorか確認
+        current_widget = self.tab_widget.currentWidget()
+        if not isinstance(current_widget, ProblemEditor):
+            QMessageBox.warning(
+                self,
+                "警告",
+                "数式エディタを使用するには、問題タブを選択してください。"
+            )
+            return
+        
+        # 数式エディタダイアログを作成
+        dialog = MathEditorDialog(self)
+        
+        # 数式が確定されたときの処理
+        def on_formula_accepted(formula, mode):
+            """数式が確定されたときに呼ばれる"""
+            if mode == "inline":
+                # インライン数式: $...$
+                current_widget.insert_markdown(f"${formula}$", "")
+            else:
+                # ディスプレイ数式: $$...$$
+                current_widget.insert_markdown(f"\n$$\n{formula}\n$$\n", "")
+        
+        # シグナルを接続
+        dialog.formula_accepted.connect(on_formula_accepted)
+        
+        # ダイアログを表示
+        dialog.exec()
     
     def open_prompt_generator(self):
         """プロンプト生成ツールを開く"""
@@ -478,15 +510,22 @@ class MainWindow(QMainWindow):
     
     def update_external_scripts_menu(self):
         """外部スクリプトメニューを更新"""
-        # ツールメニューから既存の外部スクリプト実行メニューを削除
-        menubar = self.menuBar()
-        tools_menu = None
-        for action in menubar.actions():
-            if action.text() == "ツール(&T)":
-                tools_menu = action.menu()
-                break
-        
-        if not tools_menu:
+        try:
+            # ツールメニューから既存の外部スクリプト実行メニューを削除
+            menubar = self.menuBar()
+            if not menubar:
+                return
+                
+            tools_menu = None
+            for action in menubar.actions():
+                if action.text() == "ツール(&T)":
+                    tools_menu = action.menu()
+                    break
+            
+            if not tools_menu:
+                return
+        except RuntimeError:
+            # メニューがまだ作成されていない場合
             return
         
         # 既存の外部スクリプト実行メニューを削除
@@ -527,8 +566,9 @@ class MainWindow(QMainWindow):
                     if script['description']:
                         script_action.setToolTip(script['description'])
                     script_action.script_data = script
+                    # クロージャの問題を避けるため、デフォルト引数で値を固定
                     script_action.triggered.connect(
-                        lambda checked=False, s=script: self.execute_external_script(s)
+                        lambda checked=False, s=dict(script): self.execute_external_script(s)
                     )
                     
                     # セパレータの後に挿入
@@ -539,11 +579,18 @@ class MainWindow(QMainWindow):
     
     def update_script_button_menu(self):
         """ツールバーのスクリプトボタンメニューを更新"""
-        if not hasattr(self, 'script_menu'):
+        try:
+            if not hasattr(self, 'script_menu'):
+                return
+            
+            if not self.script_menu:
+                return
+            
+            # 既存のメニュー項目をクリア
+            self.script_menu.clear()
+        except RuntimeError:
+            # メニューがまだ作成されていない場合
             return
-        
-        # 既存のメニュー項目をクリア
-        self.script_menu.clear()
         
         # 設定から外部スクリプトを読み込み
         from .config import config
@@ -565,8 +612,9 @@ class MainWindow(QMainWindow):
                 script_action = QAction(f"{script['name']}", self)
                 if script['description']:
                     script_action.setToolTip(script['description'])
+                # クロージャの問題を避けるため、デフォルト引数で値を固定
                 script_action.triggered.connect(
-                    lambda checked=False, s=script: self.execute_external_script(s)
+                    lambda checked=False, s=dict(script): self.execute_external_script(s)
                 )
                 self.script_menu.addAction(script_action)
             
@@ -655,7 +703,7 @@ class MainWindow(QMainWindow):
                 [python_path, script_path],
                 capture_output=True,
                 text=True,
-                timeout=60,  # 60秒タイムアウト
+                # timeout: なし - スクリプトが完了するまで待機
                 cwd=Path(script_path).parent,
                 startupinfo=startupinfo,
                 creationflags=creationflags,
@@ -678,14 +726,6 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(f"スクリプト実行完了: {name}")
             else:
                 self.statusBar().showMessage(f"スクリプト実行エラー: {name} (終了コード: {result.returncode})")
-        
-        except subprocess.TimeoutExpired:
-            QMessageBox.warning(
-                self, "タイムアウト",
-                f"スクリプトの実行がタイムアウトしました（60秒）。\n\n"
-                f"スクリプト: {name}"
-            )
-            self.statusBar().showMessage("スクリプト実行タイムアウト")
         
         except Exception as e:
             QMessageBox.critical(

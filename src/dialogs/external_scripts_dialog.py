@@ -357,12 +357,12 @@ class ExternalScriptsDialog(QDialog):
             # 環境変数をコピー
             env = os.environ.copy()
             
-            # スクリプトを実行
+            # スクリプトを実行（タイムアウトなし）
             result = subprocess.run(
                 [python_path, script_path],
                 capture_output=True,
                 text=True,
-                timeout=30,  # 30秒タイムアウト
+                # timeout: なし - スクリプトが完了するまで待機
                 cwd=Path(script_path).parent,  # スクリプトのディレクトリで実行
                 startupinfo=startupinfo,
                 creationflags=creationflags,
@@ -382,11 +382,6 @@ class ExternalScriptsDialog(QDialog):
             )
             output_dialog.exec()
             
-        except subprocess.TimeoutExpired:
-            QMessageBox.warning(
-                self, "タイムアウト",
-                "スクリプトの実行がタイムアウトしました（30秒）。"
-            )
         except Exception as e:
             QMessageBox.critical(
                 self, "実行エラー",
