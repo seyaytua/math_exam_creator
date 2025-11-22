@@ -75,7 +75,14 @@ class ImageInsertDialog(QDialog):
         settings_layout.addRow("代替テキスト:", self.alt_text_edit)
         
         self.alignment_combo = QComboBox()
-        self.alignment_combo.addItems(["左寄せ", "中央揃え", "右寄せ"])
+        self.alignment_combo.addItems([
+            "左寄せ", 
+            "中央揃え", 
+            "右寄せ",
+            "テキストに回り込み（左）",
+            "テキストに回り込み（右）",
+            "インライン（文中）"
+        ])
         self.alignment_combo.setCurrentIndex(1)
         settings_layout.addRow("配置:", self.alignment_combo)
         
@@ -164,18 +171,31 @@ class ImageInsertDialog(QDialog):
         mime_type = mime_types.get(suffix, 'image/png')
         
         # 配置スタイルを取得
-        alignment_styles = {
-            0: 'text-align: left;',
-            1: 'text-align: center;',
-            2: 'text-align: right;'
-        }
-        alignment_style = alignment_styles.get(self.alignment_combo.currentIndex(), 'text-align: center;')
-        
+        alignment_index = self.alignment_combo.currentIndex()
         width = self.width_spin.value()
         alt_text = self.alt_text_edit.text() or "画像"
         
-        # HTMLコードを生成
-        html = f'''<div style="{alignment_style}">
+        # HTMLコードを生成（配置に応じて変更）
+        if alignment_index == 0:  # 左寄せ
+            html = f'''<div style="text-align: left;">
+    <img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" style="max-width: 100%;" />
+</div>'''
+        elif alignment_index == 1:  # 中央揃え
+            html = f'''<div style="text-align: center;">
+    <img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" style="max-width: 100%;" />
+</div>'''
+        elif alignment_index == 2:  # 右寄せ
+            html = f'''<div style="text-align: right;">
+    <img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" style="max-width: 100%;" />
+</div>'''
+        elif alignment_index == 3:  # テキスト回り込み（左）
+            html = f'''<img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" style="float: left; margin-right: 15px; margin-bottom: 10px; max-width: 100%;" />'''
+        elif alignment_index == 4:  # テキスト回り込み（右）
+            html = f'''<img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" style="float: right; margin-left: 15px; margin-bottom: 10px; max-width: 100%;" />'''
+        elif alignment_index == 5:  # インライン（文中）
+            html = f'''<img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" style="display: inline; vertical-align: middle; max-width: 100%;" />'''
+        else:
+            html = f'''<div style="text-align: center;">
     <img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" style="max-width: 100%;" />
 </div>'''
         
@@ -204,9 +224,23 @@ class ImageInsertDialog(QDialog):
         mime_type = mime_types.get(suffix, 'image/png')
         
         alt_text = self.alt_text_edit.text() or "画像"
-        
-        # Markdownコードを生成（HTML形式で埋め込み）
         width = self.width_spin.value()
-        markdown = f'<img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" />'
+        alignment_index = self.alignment_combo.currentIndex()
+        
+        # Markdownコードを生成（配置に応じて変更）
+        if alignment_index == 0:  # 左寄せ
+            markdown = f'<div style="text-align: left;"><img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" /></div>'
+        elif alignment_index == 1:  # 中央揃え
+            markdown = f'<div style="text-align: center;"><img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" /></div>'
+        elif alignment_index == 2:  # 右寄せ
+            markdown = f'<div style="text-align: right;"><img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" /></div>'
+        elif alignment_index == 3:  # テキスト回り込み（左）
+            markdown = f'<img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" style="float: left; margin-right: 15px; margin-bottom: 10px;" />'
+        elif alignment_index == 4:  # テキスト回り込み（右）
+            markdown = f'<img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" style="float: right; margin-left: 15px; margin-bottom: 10px;" />'
+        elif alignment_index == 5:  # インライン（文中）
+            markdown = f'<img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" style="display: inline; vertical-align: middle;" />'
+        else:
+            markdown = f'<img src="data:{mime_type};base64,{base64_data}" alt="{alt_text}" width="{width}" />'
         
         return markdown

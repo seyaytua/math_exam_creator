@@ -179,12 +179,20 @@ class HTMLExporter:
     <script>
         MathJax = {{
             tex: {{
-                inlineMath: [['\\(', '\\)'], ['$', '$']],
-                displayMath: [['\\[', '\\]'], ['$$', '$$']],
-                processEscapes: true
+                inlineMath: [['$', '$']],
+                displayMath: [['$$', '$$']],
+                processEscapes: true,
+                packages: {{'[+]': ['noerrors']}}
             }},
             options: {{
                 skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }},
+            startup: {{
+                pageReady: () => {{
+                    return MathJax.startup.defaultPageReady().then(() => {{
+                        console.log('MathJax loaded successfully');
+                    }});
+                }}
             }}
         }};
     </script>

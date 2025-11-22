@@ -50,9 +50,11 @@ class MarkdownRenderer:
         for i, (math_type, content) in enumerate(self.math_blocks):
             placeholder = f'MATHBLOCK{i}MATHBLOCK'
             if math_type == 'display':
-                math_html = f'<div class="math-display">\\[{content}\\]</div>'
+                # ディスプレイ数式: $$...$$形式で復元（MathJaxが処理）
+                math_html = f'<div class="math-display">$$\n{content}\n$$</div>'
             else:
-                math_html = f'<span class="math-inline">\\({content}\\)</span>'
+                # インライン数式: $...$形式で復元（MathJaxが処理）
+                math_html = f'<span class="math-inline">${content}$</span>'
             html = html.replace(placeholder, math_html)
         
         return html
@@ -69,12 +71,20 @@ class MarkdownRenderer:
     <script>
         MathJax = {{
             tex: {{
-                inlineMath: [['\\(', '\\)'], ['$', '$']],
-                displayMath: [['\\[', '\\]'], ['$$', '$$']],
-                processEscapes: true
+                inlineMath: [['$', '$']],
+                displayMath: [['$$', '$$']],
+                processEscapes: true,
+                packages: {{'[+]': ['noerrors']}}
             }},
             options: {{
                 skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }},
+            startup: {{
+                pageReady: () => {{
+                    return MathJax.startup.defaultPageReady().then(() => {{
+                        console.log('MathJax initialization complete');
+                    }});
+                }}
             }}
         }};
     </script>
