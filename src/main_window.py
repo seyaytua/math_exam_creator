@@ -29,6 +29,7 @@ class MainWindow(QMainWindow):
         self.init_ui()
         self.load_window_settings()
         self.update_window_title()
+        self.update_external_scripts_menu()
     
     def init_ui(self):
         """UIの初期化"""
@@ -447,7 +448,154 @@ class MainWindow(QMainWindow):
     
     def open_external_scripts_settings(self):
         """外部スクリプト設定を開く"""
-        QMessageBox.information(self, "外部スクリプト設定", "外部スクリプト設定は実装予定です")
+        from .dialogs import ExternalScriptsDialog
+        
+        dialog = ExternalScriptsDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            # 設定が保存されたら、外部スクリプトメニューを更新
+            self.update_external_scripts_menu()
+    
+    def update_external_scripts_menu(self):
+        """外部スクリプトメニューを更新"""
+        # ツールメニューから既存の外部スクリプト実行メニューを削除
+        menubar = self.menuBar()
+        tools_menu = None
+        for action in menubar.actions():
+            if action.text() == "ツール(&T)":
+                tools_menu = action.menu()
+                break
+        
+        if not tools_menu:
+            return
+        
+        # 既存の外部スクリプト実行メニューを削除
+        for action in tools_menu.actions():
+            if hasattr(action, 'script_data'):
+                tools_menu.removeAction(action)
+        
+        # 設定から外部スクリプトを読み込み
+        from .config import config
+        scripts = []
+        for i in range(3):
+            script_config = config.get(f'external_scripts.script{i+1}', {})
+            if script_config.get('name') and script_config.get('script_path'):
+                scripts.append({
+                    'number': i + 1,
+                    'name': script_config.get('name'),
+                    'description': script_config.get('description', ''),
+                    'python_path': script_config.get('python_path'),
+                    'script_path': script_config.get('script_path')
+                })
+        
+        # 外部スクリプトメニューを追加
+        if scripts:
+            # プロンプト生成の後に区切り線があるので、その後に挿入
+            insert_after = None
+            for action in tools_menu.actions():
+                if action.text() == "プロンプト生成(&P)":
+                    insert_after = action
+                    break
+            
+            # セパレータの後に外部スクリプトメニューを追加
+            if insert_after:
+                actions = tools_menu.actions()
+                separator_index = actions.index(insert_after) + 1
+                
+                for script in scripts:
+                    script_action = QAction(f"▶ {script['name']}", self)
+                    if script['description']:
+                        script_action.setToolTip(script['description'])
+                    script_action.script_data = script
+                    script_action.triggered.connect(
+                        lambda checked=False, s=script: self.execute_external_script(s)
+                    )
+                    
+                    # セパレータの後に挿入
+                    if separator_index < len(actions):
+                        tools_menu.insertAction(actions[separator_index], script_action)
+                    else:
+                        tools_menu.addAction(script_action)
+    
+    def execute_external_script(self, script_data: dict):
+        """外部スクリプトを実行
+        
+        Args:
+            script_data: スクリプト情報の辞書
+        """
+        import subprocess
+        from pathlib import Path
+        from .dialogs import ScriptOutputDialog
+        
+        name = script_data['name']
+        python_path = script_data['python_path']
+        script_path = script_data['script_path']
+        
+        # バリデーション
+        if not Path(script_path).exists():
+            QMessageBox.warning(
+                self, "エラー",
+                f"スクリプトファイルが見つかりません:\n{script_path}"
+            )
+            return
+        
+        if not Path(python_path).exists():
+            QMessageBox.warning(
+                self, "エラー",
+                f"Pythonインタープリタが見つかりません:\n{python_path}"
+            )
+            return
+        
+        # 実行確認
+        reply = QMessageBox.question(
+            self, "スクリプト実行",
+            f"スクリプト '{name}' を実行しますか？",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply != QMessageBox.Yes:
+            return
+        
+        # 実行
+        self.statusBar().showMessage(f"スクリプトを実行中: {name}")
+        
+        try:
+            result = subprocess.run(
+                [python_path, script_path],
+                capture_output=True,
+                text=True,
+                timeout=60,  # 60秒タイムアウト
+                cwd=Path(script_path).parent
+            )
+            
+            # 結果を表示
+            output_dialog = ScriptOutputDialog(
+                name,
+                result.stdout,
+                result.stderr,
+                result.returncode,
+                self
+            )
+            output_dialog.exec()
+            
+            if result.returncode == 0:
+                self.statusBar().showMessage(f"スクリプト実行完了: {name}")
+            else:
+                self.statusBar().showMessage(f"スクリプト実行エラー: {name} (終了コード: {result.returncode})")
+        
+        except subprocess.TimeoutExpired:
+            QMessageBox.warning(
+                self, "タイムアウト",
+                f"スクリプトの実行がタイムアウトしました（60秒）。\n\n"
+                f"スクリプト: {name}"
+            )
+            self.statusBar().showMessage("スクリプト実行タイムアウト")
+        
+        except Exception as e:
+            QMessageBox.critical(
+                self, "実行エラー",
+                f"スクリプトの実行中にエラーが発生しました:\n\n{str(e)}"
+            )
+            self.statusBar().showMessage("スクリプト実行エラー")
     
     def open_print_settings(self):
         """印刷設定を開く"""
