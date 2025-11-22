@@ -143,13 +143,24 @@ class ExternalScriptsDialog(QDialog):
         
         python_layout.addLayout(python_path_layout)
         
-        # 現在のPythonを使用ボタン
+        # Python検出ボタンとドロップダウン
+        python_buttons_layout = QHBoxLayout()
+        
         use_current_button = QPushButton("現在のPythonを使用")
         use_current_button.clicked.connect(
             lambda: python_path_edit.setText(sys.executable)
         )
         use_current_button.setStyleSheet("background-color: #e0e0e0;")
-        python_layout.addWidget(use_current_button)
+        python_buttons_layout.addWidget(use_current_button)
+        
+        detect_button = QPushButton("自動検出...")
+        detect_button.clicked.connect(
+            lambda: self.detect_python_installations(python_path_edit)
+        )
+        detect_button.setStyleSheet("background-color: #e0e0e0;")
+        python_buttons_layout.addWidget(detect_button)
+        
+        python_layout.addLayout(python_buttons_layout)
         
         python_info_label = QLabel(f"現在のPython: {sys.executable}")
         python_info_label.setStyleSheet("color: #666; font-size: 9pt;")
@@ -219,6 +230,67 @@ class ExternalScriptsDialog(QDialog):
         if file_path:
             line_edit.setText(file_path)
     
+    def detect_python_installations(self, line_edit: QLineEdit):
+        """システム内のPythonインストールを検出して選択"""
+        from ..utils import PythonDetector
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QHBoxLayout, QLabel
+        
+        # Pythonインストールを検索
+        python_paths = PythonDetector.find_python_installations()
+        
+        if not python_paths:
+            QMessageBox.information(
+                self, "Pythonが見つかりません",
+                "システム内にPythonインストールが見つかりませんでした。\n"
+                "手動でパスを指定してください。"
+            )
+            return
+        
+        # 選択ダイアログを作成
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Pythonインストールを選択")
+        dialog.setMinimumSize(600, 400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        info_label = QLabel(f"検出されたPythonインストール: {len(python_paths)}個")
+        info_label.setStyleSheet("font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+        
+        list_widget = QListWidget()
+        
+        # バージョン情報を取得して表示
+        for python_path in python_paths:
+            version = PythonDetector.get_python_version(python_path)
+            if version:
+                display_text = f"{python_path}  (Python {version})"
+            else:
+                display_text = python_path
+            list_widget.addItem(display_text)
+        
+        list_widget.setCurrentRow(0)
+        layout.addWidget(list_widget)
+        
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        cancel_button = QPushButton("キャンセル")
+        cancel_button.clicked.connect(dialog.reject)
+        button_layout.addWidget(cancel_button)
+        
+        select_button = QPushButton("選択")
+        select_button.setDefault(True)
+        select_button.clicked.connect(dialog.accept)
+        button_layout.addWidget(select_button)
+        
+        layout.addLayout(button_layout)
+        
+        if dialog.exec() == QDialog.Accepted:
+            selected_index = list_widget.currentRow()
+            if 0 <= selected_index < len(python_paths):
+                selected_path = python_paths[selected_index]
+                line_edit.setText(selected_path)
+    
     def test_current_script(self):
         """選択中のスクリプトをテスト実行"""
         current_index = self.tab_widget.currentIndex()
@@ -263,15 +335,40 @@ class ExternalScriptsDialog(QDialog):
     def execute_script(self, name: str, python_path: str, script_path: str):
         """スクリプトを実行"""
         import subprocess
+        import sys
+        import os
         
         try:
+            # プラットフォーム別の設定
+            startupinfo = None
+            creationflags = 0
+            extra_kwargs = {}
+            
+            if sys.platform == 'win32':
+                # Windows: コンソールウィンドウを非表示
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+                creationflags = subprocess.CREATE_NO_WINDOW
+            elif sys.platform == 'darwin':
+                # macOS: 新しいターミナルウィンドウを開かない
+                extra_kwargs['start_new_session'] = True
+            
+            # 環境変数をコピー
+            env = os.environ.copy()
+            
             # スクリプトを実行
             result = subprocess.run(
                 [python_path, script_path],
                 capture_output=True,
                 text=True,
                 timeout=30,  # 30秒タイムアウト
-                cwd=Path(script_path).parent  # スクリプトのディレクトリで実行
+                cwd=Path(script_path).parent,  # スクリプトのディレクトリで実行
+                startupinfo=startupinfo,
+                creationflags=creationflags,
+                env=env,
+                stdin=subprocess.DEVNULL,  # 標準入力を無効化
+                **extra_kwargs
             )
             
             # 結果を表示

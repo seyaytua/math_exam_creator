@@ -30,6 +30,7 @@ class MainWindow(QMainWindow):
         self.load_window_settings()
         self.update_window_title()
         self.update_external_scripts_menu()
+        self.update_script_button_menu()
     
     def init_ui(self):
         """UIの初期化"""
@@ -199,6 +200,25 @@ class MainWindow(QMainWindow):
         add_problem_action = QAction("新しい問題", self)
         add_problem_action.triggered.connect(self.add_problem_tab)
         toolbar.addAction(add_problem_action)
+        
+        toolbar.addSeparator()
+        
+        # 外部スクリプト実行ボタン（ドロップダウン付き）
+        from PySide6.QtWidgets import QToolButton, QMenu
+        
+        self.script_button = QToolButton()
+        self.script_button.setText("▶ スクリプト")
+        self.script_button.setPopupMode(QToolButton.InstantPopup)
+        self.script_button.setToolTip("登録した外部スクリプトを実行")
+        
+        # スクリプトメニューを作成
+        self.script_menu = QMenu()
+        self.script_button.setMenu(self.script_menu)
+        
+        # 初期メニューを構築
+        self.update_script_button_menu()
+        
+        toolbar.addWidget(self.script_button)
         
         self.addToolBar(toolbar)
     
@@ -454,6 +474,7 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.Accepted:
             # 設定が保存されたら、外部スクリプトメニューを更新
             self.update_external_scripts_menu()
+            self.update_script_button_menu()
     
     def update_external_scripts_menu(self):
         """外部スクリプトメニューを更新"""
@@ -516,6 +537,54 @@ class MainWindow(QMainWindow):
                     else:
                         tools_menu.addAction(script_action)
     
+    def update_script_button_menu(self):
+        """ツールバーのスクリプトボタンメニューを更新"""
+        if not hasattr(self, 'script_menu'):
+            return
+        
+        # 既存のメニュー項目をクリア
+        self.script_menu.clear()
+        
+        # 設定から外部スクリプトを読み込み
+        from .config import config
+        scripts = []
+        for i in range(3):
+            script_config = config.get(f'external_scripts.script{i+1}', {})
+            if script_config.get('name') and script_config.get('script_path'):
+                scripts.append({
+                    'number': i + 1,
+                    'name': script_config.get('name'),
+                    'description': script_config.get('description', ''),
+                    'python_path': script_config.get('python_path'),
+                    'script_path': script_config.get('script_path')
+                })
+        
+        # スクリプトが登録されている場合
+        if scripts:
+            for script in scripts:
+                script_action = QAction(f"{script['name']}", self)
+                if script['description']:
+                    script_action.setToolTip(script['description'])
+                script_action.triggered.connect(
+                    lambda checked=False, s=script: self.execute_external_script(s)
+                )
+                self.script_menu.addAction(script_action)
+            
+            self.script_menu.addSeparator()
+        
+        # 「スクリプト設定」メニュー項目を追加
+        settings_action = QAction("スクリプト設定...", self)
+        settings_action.triggered.connect(self.open_external_scripts_settings)
+        self.script_menu.addAction(settings_action)
+        
+        # スクリプトがない場合はボタンを無効化
+        if not scripts:
+            # デフォルトメッセージを表示
+            no_scripts_action = QAction("（スクリプト未登録）", self)
+            no_scripts_action.setEnabled(False)
+            self.script_menu.insertAction(settings_action, no_scripts_action)
+            self.script_menu.insertSeparator(settings_action)
+    
     def execute_external_script(self, script_data: dict):
         """外部スクリプトを実行
         
@@ -559,12 +628,40 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"スクリプトを実行中: {name}")
         
         try:
+            # プラットフォーム別の設定
+            import sys
+            import os
+            
+            startupinfo = None
+            creationflags = 0
+            extra_kwargs = {}
+            
+            if sys.platform == 'win32':
+                # Windows: コンソールウィンドウを非表示
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+                creationflags = subprocess.CREATE_NO_WINDOW
+            elif sys.platform == 'darwin':
+                # macOS: 新しいターミナルウィンドウを開かない
+                # stdin/stdout/stderrをキャプチャすることで、ターミナルが開かなくなる
+                # さらにstart_new_session=Trueで新しいセッションを作成
+                extra_kwargs['start_new_session'] = True
+            
+            # 環境変数をコピー
+            env = os.environ.copy()
+            
             result = subprocess.run(
                 [python_path, script_path],
                 capture_output=True,
                 text=True,
                 timeout=60,  # 60秒タイムアウト
-                cwd=Path(script_path).parent
+                cwd=Path(script_path).parent,
+                startupinfo=startupinfo,
+                creationflags=creationflags,
+                env=env,
+                stdin=subprocess.DEVNULL,  # 標準入力を無効化
+                **extra_kwargs
             )
             
             # 結果を表示
