@@ -95,9 +95,33 @@ pip install xhtml2pdf
 
 ### アプリケーションの起動
 
+#### 開発モード（ソースコードから実行）
+
 ```bash
 python main.py
 ```
+
+#### 実行ファイル版
+
+**ダウンロード**
+
+[GitHubリリースページ](https://github.com/seyaytua/math_exam_creator/releases)から、お使いのOSに合わせたファイルをダウンロード：
+
+- **macOS**: `Math-Exam-Creator-macOS.zip`
+- **Windows**: `Math-Exam-Creator-Windows.zip`
+
+**macOS**
+1. ZIPファイルを解凍
+2. `Math Exam Creator.app` をアプリケーションフォルダにドラッグ
+3. ダブルクリックで起動
+
+**Windows**
+1. ZIPファイルを解凍
+2. `MathExamCreator.exe` をダブルクリックで起動
+
+**ビルド方法**
+
+実行ファイルを自分でビルドする場合は、[BUILD.md](BUILD.md)を参照してください。
 
 ### 基本的な操作
 

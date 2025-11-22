@@ -41,3 +41,11 @@ Thumbs.db
 *.mep
 *.log
 .math_exam_creator/
+
+# PyInstaller
+*.spec.backup
+build/
+dist/
+*.dmg
+*.app
+*.exe
