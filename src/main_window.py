@@ -658,6 +658,11 @@ class MainWindow(QMainWindow):
         from .dialogs import ExportDialog
         from .exporters import HTMLExporter, PDFExporter
         
+        # PDF Exporterが利用できない場合の確認
+        if PDFExporter is None:
+            # PDF選択時にエラーメッセージを表示
+            pass  # ExportDialogで制御
+        
         # エクスポート設定ダイアログを表示
         dialog = ExportDialog(self)
         if dialog.exec() != QDialog.Accepted:
@@ -665,6 +670,18 @@ class MainWindow(QMainWindow):
         
         options = dialog.get_options()
         export_format = options.get('format', 'html')
+        
+        # PDFが選択されたがPDFExporterが利用できない場合
+        if export_format == 'pdf' and PDFExporter is None:
+            QMessageBox.warning(
+                self, "PDF出力エラー",
+                "PDF出力には追加のライブラリが必要です。\n\n"
+                "macOSの場合、以下のコマンドを実行してください:\n\n"
+                "  brew install cairo pango gdk-pixbuf libffi\n"
+                "  pip3 install --upgrade weasyprint\n\n"
+                "詳細はREADME.mdを参照してください。"
+            )
+            return
         
         # 表紙データを追加
         cover_data = self.cover_editor.get_cover_data()
