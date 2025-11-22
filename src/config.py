@@ -23,11 +23,20 @@ class Config:
         self.load()
     
     def load(self):
-        """設定ファイルを読み込む"""
+        """設定ファイルを読み込む（プラットフォーム互換）"""
         try:
             if self.config_file.exists():
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    self.settings = json.load(f)
+                # UTF-8 で読み込み（BOM対応）
+                encodings = ['utf-8-sig', 'utf-8']
+                for encoding in encodings:
+                    try:
+                        with open(self.config_file, 'r', encoding=encoding) as f:
+                            self.settings = json.load(f)
+                        return
+                    except (UnicodeDecodeError, json.JSONDecodeError):
+                        continue
+                # 読み込み失敗時はデフォルト
+                self.settings = self._get_default_settings()
             else:
                 self.settings = self._get_default_settings()
         except Exception as e:
@@ -35,10 +44,11 @@ class Config:
             self.settings = self._get_default_settings()
     
     def save(self):
-        """設定ファイルを保存する"""
+        """設定ファイルを保存する（プラットフォーム互換）"""
         try:
             self.config_dir.mkdir(parents=True, exist_ok=True)
-            with open(self.config_file, 'w', encoding='utf-8') as f:
+            # UTF-8 で保存（改行コード統一）
+            with open(self.config_file, 'w', encoding='utf-8', newline='\n') as f:
                 json.dump(self.settings, f, indent=4, ensure_ascii=False)
         except Exception as e:
             print(f"設定ファイルの保存に失敗しました: {e}")

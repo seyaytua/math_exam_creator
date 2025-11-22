@@ -15,13 +15,14 @@ class HTMLExporter:
         self.answer_generator = AnswerSheetGenerator()
     
     def export(self, project: Project, output_path: Path, options: dict = None):
-        """プロジェクトをHTMLファイルとして出力"""
+        """プロジェクトをHTMLファイルとして出力（プラットフォーム互換）"""
         if options is None:
             options = {}
         
         html = self._generate_html(project, options)
         
-        with open(output_path, 'w', encoding='utf-8') as f:
+        # UTF-8 で保存（改行コード統一、Windows 互換）
+        with open(output_path, 'w', encoding='utf-8', newline='\n') as f:
             f.write(html)
     
     def _generate_html(self, project: Project, options: dict) -> str:

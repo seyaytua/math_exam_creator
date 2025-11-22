@@ -1,0 +1,245 @@
+# Math Exam Creator
+
+数学のテスト問題を効率的に作成・管理・出力するためのデスクトップアプリケーション
+
+## バージョン
+
+**v1.1.0**
+
+## 特徴
+
+- ✅ **マークダウンエディタ**: リアルタイムプレビュー付き
+- ✅ **数式サポート**: MathJax による LaTeX 数式レンダリング
+- ✅ **HTMLエディタ**: 直接HTML編集も可能
+- ✅ **表紙作成**: 試験情報の入力と管理
+- ✅ **配点設定**: 各問題に配点を設定
+- ✅ **必答・選択**: 問題タイプの区別
+- ✅ **解答用紙自動生成**: 空欄（ア、イ、ウ等）を自動検出
+- ✅ **PDF出力**: HTML/PDF形式でエクスポート
+- ✅ **画像挿入**: Base64埋め込みで外部ファイル不要
+- ✅ **問題並び替え**: ドラッグ&ドロップで順序変更
+- ✅ **プロンプト生成**: AI用プロンプトの自動作成
+
+## 対応環境
+
+### サポートOS
+
+- ✅ **macOS** (10.15 Catalina 以降)
+- ✅ **Windows** (Windows 10/11)
+- ✅ **Linux** (Ubuntu 20.04 以降)
+
+### プラットフォーム互換性
+
+このアプリケーションは以下の互換性対策を実装しています：
+
+- **改行コード**: すべてのプラットフォームで LF (`\n`) に統一
+- **文字エンコーディング**: UTF-8 で統一（Windows の BOM も自動処理）
+- **パス区切り**: `Path` クラスで自動変換
+- **ファイル保存**: プラットフォームに依存しない安全な保存
+
+## インストール
+
+### 1. 必要な環境
+
+- Python 3.11 以上
+- pip (パッケージ管理ツール)
+
+### 2. 依存パッケージのインストール
+
+```bash
+# リポジトリをクローン
+git clone https://github.com/seyaytua/math_exam_creator.git
+cd math_exam_creator
+
+# 仮想環境の作成（推奨）
+python -m venv venv
+
+# 仮想環境の有効化
+# macOS/Linux:
+source venv/bin/activate
+# Windows:
+venv\Scripts\activate
+
+# 依存パッケージをインストール
+pip install -r requirements.txt
+```
+
+### 3. PDF出力機能（オプション）
+
+PDF出力を使用する場合は、以下のいずれかをインストール：
+
+#### 推奨: WeasyPrint（高品質PDF）
+
+```bash
+# macOS
+brew install cairo pango gdk-pixbuf libffi
+pip install weasyprint
+
+# Windows
+# まず GTK+ をインストール（https://gtk.org/）
+pip install weasyprint
+
+# Linux (Ubuntu/Debian)
+sudo apt-get install libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev
+pip install weasyprint
+```
+
+#### 代替: xhtml2pdf（軽量）
+
+```bash
+pip install xhtml2pdf
+```
+
+## 使い方
+
+### アプリケーションの起動
+
+```bash
+python main.py
+```
+
+### 基本的な操作
+
+1. **新規プロジェクト作成**: `ファイル` → `新規プロジェクト`
+2. **表紙の編集**: 「表紙」タブで試験情報を入力
+3. **問題作成**: `挿入` → `新しい問題` で問題を追加
+4. **数式入力**: 
+   - インライン数式: `$x^2 + 1$`
+   - ディスプレイ数式: `$$\int_0^1 x dx$$`
+5. **画像挿入**: ツールバーの「画像を挿入」ボタン
+6. **エクスポート**: `ファイル` → `エクスポート` (HTML/PDF選択)
+
+### 数式の記述
+
+#### インライン数式（文中）
+
+```markdown
+方程式 $x^2 + 2x + 1 = 0$ を解け。
+```
+
+#### ディスプレイ数式（独立）
+
+```markdown
+次の積分を計算せよ。
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
+```
+
+#### よく使うLaTeX記法
+
+```latex
+分数:     $\frac{1}{2}$
+根号:     $\sqrt{x}$
+積分:     $\int_a^b f(x) dx$
+総和:     $\sum_{i=1}^n i$
+極限:     $\lim_{x \to 0} f(x)$
+上付き:   $x^2$
+下付き:   $x_i$
+ギリシャ文字: $\alpha$, $\beta$, $\theta$
+```
+
+### 画像の配置オプション
+
+- **左寄せ**: 画像を左に配置
+- **中央揃え**: 画像を中央に配置（デフォルト）
+- **右寄せ**: 画像を右に配置
+- **テキスト回り込み（左）**: 画像を左に配置し、テキストが回り込む
+- **テキスト回り込み（右）**: 画像を右に配置し、テキストが回り込む
+- **インライン**: 文中に画像を配置
+
+## トラブルシューティング
+
+### Windows で日本語が文字化けする
+
+アプリケーションはUTF-8で統一されているため、通常は問題ありません。
+もし文字化けが発生した場合：
+
+1. Pythonの環境変数を確認:
+   ```cmd
+   set PYTHONIOENCODING=utf-8
+   ```
+
+2. システムロケールをUTF-8に設定（Windows 11）
+
+### 数式が表示されない
+
+1. インターネット接続を確認（MathJax は CDN 経由）
+2. 数式の記法を確認（`$` または `$$` で囲む）
+3. ブラウザで開いてJavaScriptが有効か確認
+
+### PDF出力でエラーが出る
+
+1. weasyprint または xhtml2pdf がインストールされているか確認
+   ```bash
+   pip list | grep weasyprint
+   pip list | grep xhtml2pdf
+   ```
+
+2. Windows の場合、GTK+ が正しくインストールされているか確認
+
+## ファイル形式
+
+### プロジェクトファイル (.mep)
+
+JSON形式で保存されます：
+
+```json
+{
+  "version": "1.0",
+  "title": "第1回定期考査",
+  "cover_content": "{...}",
+  "problems": [...]
+}
+```
+
+### 設定ファイル
+
+場所: `~/.math_exam_creator/config.json`
+
+## 開発
+
+### 開発環境のセットアップ
+
+```bash
+# 開発用パッケージのインストール
+pip install pytest black flake8 mypy
+
+# コードフォーマット
+black src/
+
+# 型チェック
+mypy src/
+
+# テスト実行
+pytest tests/
+```
+
+## ライセンス
+
+MIT License
+
+## サポート
+
+問題や質問がある場合は、GitHub Issues をご利用ください。
+
+## 変更履歴
+
+### v1.1.0 (2025-11-22)
+
+- 問題に配点フィールドを追加
+- 必答・選択の区別機能
+- 解答用紙自動生成機能
+- PDF直接出力機能
+- 問題並び替え機能
+- 画像挿入機能（6種類の配置オプション）
+- 数式表示の改善
+- Windows環境の完全サポート
+
+### v1.0.0 (2025-11-22)
+
+- 初回リリース
+- 基本的な問題作成・編集機能
+- HTML出力機能
+- プロンプト生成機能

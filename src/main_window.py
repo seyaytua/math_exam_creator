@@ -459,9 +459,17 @@ class MainWindow(QMainWindow):
     
     def show_about(self):
         """アプリケーション情報を表示"""
+        from .utils import PlatformUtils
+        import sys
+        
         version = get_version()
         release_notes = get_release_notes(version)
         notes_html = "<ul>" + "".join([f"<li>{note}</li>" for note in release_notes[:5]]) + "</ul>"
+        
+        # プラットフォーム情報
+        platform_name = "Windows" if PlatformUtils.is_windows() else \
+                       "macOS" if PlatformUtils.is_macos() else \
+                       "Linux" if PlatformUtils.is_linux() else "Unknown"
         
         QMessageBox.about(
             self,
@@ -472,6 +480,13 @@ class MainWindow(QMainWindow):
             f"<hr>"
             f"<p><b>主な機能:</b></p>"
             f"{notes_html}"
+            f"<hr>"
+            f"<p style='font-size: 9pt; color: #666;'>"
+            f"<b>システム情報:</b><br>"
+            f"プラットフォーム: {platform_name}<br>"
+            f"Python: {sys.version.split()[0]}<br>"
+            f"エンコーディング: UTF-8"
+            f"</p>"
         )
     
     def load_window_settings(self):

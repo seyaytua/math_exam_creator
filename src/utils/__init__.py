@@ -3,5 +3,6 @@
 
 from .markdown_renderer import MarkdownRenderer
 from .answer_sheet_generator import AnswerSheetGenerator
+from .platform_utils import PlatformUtils
 
-__all__ = ['MarkdownRenderer', 'AnswerSheetGenerator']
+__all__ = ['MarkdownRenderer', 'AnswerSheetGenerator', 'PlatformUtils']

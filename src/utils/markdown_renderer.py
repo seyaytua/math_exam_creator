@@ -28,7 +28,18 @@ class MarkdownRenderer:
     def _protect_math(self, text: str) -> tuple:
         """数式を保護"""
         math_blocks = []
+        code_blocks = []
         
+        # 1. まずコードブロックを保護（数式が含まれている場合）
+        def replace_code_block(match):
+            index = len(code_blocks)
+            code_blocks.append(match.group(0))
+            return f'CODEBLOCK{index}CODEBLOCK'
+        
+        # ```で囲まれたコードブロックを保護
+        text = re.sub(r'```[\s\S]*?```', replace_code_block, text)
+        
+        # 2. ディスプレイ数式を保護
         def replace_display(match):
             index = len(math_blocks)
             math_blocks.append(('display', match.group(1)))
@@ -36,12 +47,17 @@ class MarkdownRenderer:
         
         text = re.sub(r'\$\$(.*?)\$\$', replace_display, text, flags=re.DOTALL)
         
+        # 3. インライン数式を保護
         def replace_inline(match):
             index = len(math_blocks)
             math_blocks.append(('inline', match.group(1)))
             return f'MATHBLOCK{index}MATHBLOCK'
         
         text = re.sub(r'\$([^\$\n]+?)\$', replace_inline, text)
+        
+        # コードブロックを復元（数式保護後）
+        for i, code_block in enumerate(code_blocks):
+            text = text.replace(f'CODEBLOCK{i}CODEBLOCK', code_block)
         
         return text, math_blocks
     
