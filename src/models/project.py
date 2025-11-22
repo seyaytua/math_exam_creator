@@ -56,7 +56,7 @@ class Project:
     
     def __init__(self):
         self.title = "新規プロジェクト"
-        self.cover_content = ""
+        self.cover_content: Dict[str, str] = {}  # 表紙データを辞書形式で保存
         self.problems: List[Problem] = []
         self.created_at = datetime.now().isoformat()
         self.updated_at = datetime.now().isoformat()
@@ -89,7 +89,15 @@ class Project:
         """辞書から生成"""
         project = cls()
         project.title = data.get("title", "新規プロジェクト")
-        project.cover_content = data.get("cover_content", "")
+        
+        # 表紙データの互換性処理（古い文字列形式と新しい辞書形式に対応）
+        cover_data = data.get("cover_content", {})
+        if isinstance(cover_data, str):
+            # 古い形式（文字列）の場合は空の辞書に変換
+            project.cover_content = {}
+        else:
+            project.cover_content = cover_data
+        
         project.problems = [Problem.from_dict(p) for p in data.get("problems", [])]
         project.created_at = data.get("created_at", datetime.now().isoformat())
         project.updated_at = data.get("updated_at", datetime.now().isoformat())
