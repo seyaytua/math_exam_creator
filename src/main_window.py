@@ -375,12 +375,8 @@ class MainWindow(QMainWindow):
             
             # 表紙データを復元
             if self.current_project.cover_content:
-                try:
-                    cover_data = json.loads(self.current_project.cover_content)
-                    self.cover_editor.set_cover_data(cover_data)
-                except (json.JSONDecodeError, TypeError):
-                    # 旧形式や不正なデータの場合は無視
-                    pass
+                # cover_content は辞書形式なのでそのまま設定
+                self.cover_editor.set_cover_data(self.current_project.cover_content)
             
             # 問題を読み込み
             for i, problem in enumerate(self.current_project.problems):
@@ -427,6 +423,9 @@ class MainWindow(QMainWindow):
     def _do_save(self) -> bool:
         """実際の保存処理"""
         try:
+            # 表紙データをプロジェクトに保存
+            self.current_project.cover_content = self.cover_editor.get_cover_data()
+            
             # エディタの内容をプロジェクトに保存
             for i, editor in enumerate(self.problem_editors):
                 if i < len(self.current_project.problems):
