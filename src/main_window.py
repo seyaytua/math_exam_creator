@@ -1,0 +1,500 @@
+# -*- coding: utf-8 -*-
+"""メインウィンドウ"""
+
+from PySide6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QSplitter, QTabWidget, QMenuBar, QMenu, QToolBar,
+    QMessageBox, QFileDialog, QLabel, QInputDialog, QDialog  # QDialogを追加
+)
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QAction, QKeySequence
+from pathlib import Path
+
+from .config import config
+from .styles import Styles
+from .widgets import ProblemEditor
+from .models import Project, Problem
+
+
+
+class MainWindow(QMainWindow):
+    """メインウィンドウクラス"""
+    
+    def __init__(self):
+        super().__init__()
+        self.current_project = Project()
+        self.problem_editors = []
+        self.init_ui()
+        self.load_window_settings()
+        self.update_window_title()
+    
+    def init_ui(self):
+        """UIの初期化"""
+        self.setWindowTitle("Math Exam Creator")
+        self.setStyleSheet(Styles.get_main_stylesheet())
+        self.create_menu_bar()
+        self.create_toolbar()
+        self.create_central_widget()
+        self.statusBar().showMessage("準備完了")
+    
+    def create_menu_bar(self):
+        """メニューバー作成"""
+        menubar = self.menuBar()
+        
+        # ファイルメニュー
+        file_menu = menubar.addMenu("ファイル(&F)")
+        
+        new_action = QAction("新規プロジェクト(&N)", self)
+        new_action.setShortcut(QKeySequence.New)
+        new_action.triggered.connect(self.new_project)
+        file_menu.addAction(new_action)
+        
+        open_action = QAction("プロジェクトを開く(&O)", self)
+        open_action.setShortcut(QKeySequence.Open)
+        open_action.triggered.connect(self.open_project)
+        file_menu.addAction(open_action)
+        
+        save_action = QAction("保存(&S)", self)
+        save_action.setShortcut(QKeySequence.Save)
+        save_action.triggered.connect(self.save_project)
+        file_menu.addAction(save_action)
+        
+        save_as_action = QAction("名前を付けて保存(&A)", self)
+        save_as_action.setShortcut(QKeySequence.SaveAs)
+        save_as_action.triggered.connect(self.save_project_as)
+        file_menu.addAction(save_as_action)
+        
+        file_menu.addSeparator()
+        export_html_action = QAction("HTMLとしてエクスポート(&H)", self)
+        export_html_action.triggered.connect(self.export_html)
+        file_menu.addAction(export_html_action)       
+        
+        exit_action = QAction("終了(&X)", self)
+        exit_action.setShortcut(QKeySequence.Quit)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # 編集メニュー
+        edit_menu = menubar.addMenu("編集(&E)")
+        
+        undo_action = QAction("元に戻す(&U)", self)
+        undo_action.setShortcut(QKeySequence.Undo)
+        edit_menu.addAction(undo_action)
+        
+        redo_action = QAction("やり直し(&R)", self)
+        redo_action.setShortcut(QKeySequence.Redo)
+        edit_menu.addAction(redo_action)
+        
+        edit_menu.addSeparator()
+        
+        cut_action = QAction("切り取り(&T)", self)
+        cut_action.setShortcut(QKeySequence.Cut)
+        edit_menu.addAction(cut_action)
+        
+        copy_action = QAction("コピー(&C)", self)
+        copy_action.setShortcut(QKeySequence.Copy)
+        edit_menu.addAction(copy_action)
+        
+        paste_action = QAction("貼り付け(&P)", self)
+        paste_action.setShortcut(QKeySequence.Paste)
+        edit_menu.addAction(paste_action)
+        
+        # 挿入メニュー
+        insert_menu = menubar.addMenu("挿入(&I)")
+        
+        insert_problem = QAction("新しい問題(&P)", self)
+        insert_problem.setShortcut(QKeySequence("Ctrl+Shift+N"))
+        insert_problem.triggered.connect(self.add_problem_tab)
+        insert_menu.addAction(insert_problem)
+        
+        insert_menu.addSeparator()
+        
+        insert_inline_math = QAction("インライン数式(&I)", self)
+        insert_inline_math.setShortcut(QKeySequence("Ctrl+M"))
+        insert_inline_math.triggered.connect(self.insert_inline_math)
+        insert_menu.addAction(insert_inline_math)
+        
+        insert_display_math = QAction("ディスプレイ数式(&D)", self)
+        insert_display_math.setShortcut(QKeySequence("Ctrl+Shift+M"))
+        insert_display_math.triggered.connect(self.insert_display_math)
+        insert_menu.addAction(insert_display_math)
+        
+        insert_menu.addSeparator()
+        
+        open_math_editor = QAction("数式エディタ(&M)", self)
+        open_math_editor.triggered.connect(self.open_math_editor)
+        insert_menu.addAction(open_math_editor)
+        
+        # 表示メニュー
+        view_menu = menubar.addMenu("表示(&V)")
+        
+        zoom_in = QAction("拡大(&I)", self)
+        zoom_in.setShortcut(QKeySequence.ZoomIn)
+        view_menu.addAction(zoom_in)
+        
+        zoom_out = QAction("縮小(&O)", self)
+        zoom_out.setShortcut(QKeySequence.ZoomOut)
+        view_menu.addAction(zoom_out)
+        
+        zoom_reset = QAction("実際のサイズ(&R)", self)
+        zoom_reset.setShortcut(QKeySequence("Ctrl+0"))
+        view_menu.addAction(zoom_reset)
+        
+        # ツールメニュー
+        tools_menu = menubar.addMenu("ツール(&T)")
+        
+        prompt_generator = QAction("プロンプト生成(&P)", self)
+        prompt_generator.triggered.connect(self.open_prompt_generator)
+        tools_menu.addAction(prompt_generator)
+        
+        tools_menu.addSeparator()
+        
+        external_scripts = QAction("外部スクリプト設定(&E)", self)
+        external_scripts.triggered.connect(self.open_external_scripts_settings)
+        tools_menu.addAction(external_scripts)
+        
+        tools_menu.addSeparator()
+        
+        print_settings = QAction("印刷設定(&S)", self)
+        print_settings.triggered.connect(self.open_print_settings)
+        tools_menu.addAction(print_settings)
+        
+        # ヘルプメニュー
+        help_menu = menubar.addMenu("ヘルプ(&H)")
+        
+        usage_action = QAction("使い方(&U)", self)
+        usage_action.triggered.connect(self.open_usage_window)
+        help_menu.addAction(usage_action)
+        
+        help_menu.addSeparator()
+        
+        about_action = QAction("Math Exam Creatorについて(&A)", self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+    
+    def create_toolbar(self):
+        """ツールバー作成"""
+        toolbar = QToolBar("メインツールバー")
+        toolbar.setIconSize(QSize(24, 24))
+        toolbar.setMovable(False)
+        
+        new_action = QAction("新規", self)
+        new_action.triggered.connect(self.new_project)
+        toolbar.addAction(new_action)
+        
+        open_action = QAction("開く", self)
+        open_action.triggered.connect(self.open_project)
+        toolbar.addAction(open_action)
+        
+        save_action = QAction("保存", self)
+        save_action.triggered.connect(self.save_project)
+        toolbar.addAction(save_action)
+        
+        toolbar.addSeparator()
+        
+        add_problem_action = QAction("新しい問題", self)
+        add_problem_action.triggered.connect(self.add_problem_tab)
+        toolbar.addAction(add_problem_action)
+        
+        self.addToolBar(toolbar)
+    
+    def create_central_widget(self):
+        """中央ウィジェット作成"""
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        layout = QVBoxLayout(central_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(self.close_tab)
+        
+        self.add_cover_tab()
+        self.add_problem_tab()
+        
+        layout.addWidget(self.tab_widget)
+    
+    def add_cover_tab(self):
+        """表紙タブを追加"""
+        from .widgets import CoverEditor
+        
+        self.cover_editor = CoverEditor()
+        self.cover_editor.content_changed.connect(
+            lambda: self.statusBar().showMessage("表紙が変更されました")
+        )
+        self.tab_widget.addTab(self.cover_editor, "表紙")
+    
+    def add_problem_tab(self):
+        """問題タブを追加"""
+        problem_editor = ProblemEditor()
+        self.problem_editors.append(problem_editor)
+        
+        problem_number = len(self.problem_editors)
+        self.tab_widget.addTab(problem_editor, f"問題 {problem_number}")
+        self.tab_widget.setCurrentWidget(problem_editor)
+        
+        # プロジェクトに問題を追加
+        problem = Problem(f"問題 {problem_number}", "")
+        self.current_project.add_problem(problem)
+        
+        self.statusBar().showMessage(f"問題 {problem_number} を追加しました")
+    
+    def close_tab(self, index):
+        """タブを閉じる"""
+        if index == 0:
+            return
+        
+        widget = self.tab_widget.widget(index)
+        if isinstance(widget, ProblemEditor):
+            self.problem_editors.remove(widget)
+            self.current_project.remove_problem(index - 1)
+        
+        self.tab_widget.removeTab(index)
+    
+    def update_window_title(self):
+        """ウィンドウタイトルを更新"""
+        title = "Math Exam Creator"
+        if self.current_project.file_path:
+            title += f" - {self.current_project.file_path.name}"
+        else:
+            title += " - 新規プロジェクト"
+        self.setWindowTitle(title)
+    
+    def new_project(self):
+        """新規プロジェクト作成"""
+        reply = QMessageBox.question(
+            self, "新規プロジェクト",
+            "現在のプロジェクトを保存しますか？",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
+        )
+        
+        if reply == QMessageBox.Cancel:
+            return
+        elif reply == QMessageBox.Yes:
+            if not self.save_project():
+                return
+        
+        # 新規プロジェクト作成
+        self.current_project = Project()
+        self.problem_editors.clear()
+        
+        # タブをクリア
+        while self.tab_widget.count() > 0:
+            self.tab_widget.removeTab(0)
+        
+        # 表紙と最初の問題を追加
+        self.add_cover_tab()
+        self.add_problem_tab()
+        
+        self.update_window_title()
+        self.statusBar().showMessage("新規プロジェクトを作成しました")
+    
+    def open_project(self):
+        """プロジェクトを開く"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "プロジェクトを開く",
+            str(Path.home()),
+            "Math Exam Project (*.mep);;All Files (*)"
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            self.current_project = Project.load(Path(file_path))
+            
+            # タブをクリア
+            while self.tab_widget.count() > 0:
+                self.tab_widget.removeTab(0)
+            
+            self.problem_editors.clear()
+            
+            # 表紙を追加
+            self.add_cover_tab()
+            
+            # 問題を読み込み
+            for i, problem in enumerate(self.current_project.problems):
+                problem_editor = ProblemEditor()
+                problem_editor.set_text(problem.content)
+                self.problem_editors.append(problem_editor)
+                self.tab_widget.addTab(problem_editor, f"問題 {i + 1}")
+            
+            self.update_window_title()
+            self.statusBar().showMessage(f"プロジェクトを開きました: {Path(file_path).name}")
+        
+        except Exception as e:
+            QMessageBox.critical(
+                self, "エラー",
+                f"プロジェクトの読み込みに失敗しました:\n{str(e)}"
+            )
+    
+    def save_project(self) -> bool:
+        """プロジェクトを保存"""
+        if self.current_project.file_path:
+            return self._do_save()
+        else:
+            return self.save_project_as()
+    
+    def save_project_as(self) -> bool:
+        """プロジェクトに名前を付けて保存"""
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "名前を付けて保存",
+            str(Path.home() / "新規プロジェクト.mep"),
+            "Math Exam Project (*.mep);;All Files (*)"
+        )
+        
+        if not file_path:
+            return False
+        
+        self.current_project.file_path = Path(file_path)
+        return self._do_save()
+    
+    def _do_save(self) -> bool:
+        """実際の保存処理"""
+        try:
+            # エディタの内容をプロジェクトに保存
+            for i, editor in enumerate(self.problem_editors):
+                if i < len(self.current_project.problems):
+                    self.current_project.problems[i].content = editor.get_text()
+            
+            self.current_project.save(self.current_project.file_path)
+            self.update_window_title()
+            self.statusBar().showMessage(f"保存しました: {self.current_project.file_path.name}")
+            return True
+        
+        except Exception as e:
+            QMessageBox.critical(
+                self, "エラー",
+                f"保存に失敗しました:\n{str(e)}"
+            )
+            return False
+    
+    def insert_inline_math(self):
+        """インライン数式を挿入"""
+        current_widget = self.tab_widget.currentWidget()
+        if isinstance(current_widget, ProblemEditor):
+            current_widget.insert_markdown("$", "$")
+    
+    def insert_display_math(self):
+        """ディスプレイ数式を挿入"""
+        current_widget = self.tab_widget.currentWidget()
+        if isinstance(current_widget, ProblemEditor):
+            current_widget.insert_markdown("\n$$\n", "\n$$\n")
+    
+    def open_math_editor(self):
+        """数式エディタを開く"""
+        QMessageBox.information(self, "数式エディタ", "数式エディタは実装予定です")
+    
+    def open_prompt_generator(self):
+        """プロンプト生成ツールを開く"""
+        from .dialogs import PromptGeneratorDialog
+        
+        dialog = PromptGeneratorDialog(self)
+        dialog.exec()
+    
+    def open_external_scripts_settings(self):
+        """外部スクリプト設定を開く"""
+        QMessageBox.information(self, "外部スクリプト設定", "外部スクリプト設定は実装予定です")
+    
+    def open_print_settings(self):
+        """印刷設定を開く"""
+        QMessageBox.information(self, "印刷設定", "印刷設定は実装予定です")
+    
+    def open_usage_window(self):
+        """使い方ウィンドウを開く"""
+        QMessageBox.information(self, "使い方", "使い方ウィンドウは実装予定です")
+    
+    def show_about(self):
+        """アプリケーション情報を表示"""
+        QMessageBox.about(
+            self,
+            "Math Exam Creatorについて",
+            "<h3>Math Exam Creator</h3>"
+            "<p>バージョン: 1.0.0</p>"
+            "<p>数学考査作成支援アプリケーション</p>"
+        )
+    
+    def load_window_settings(self):
+        """ウィンドウ設定を読み込み"""
+        width = config.get("window.width", config.DEFAULT_WINDOW_WIDTH)
+        height = config.get("window.height", config.DEFAULT_WINDOW_HEIGHT)
+        self.resize(width, height)
+    
+    def save_window_settings(self):
+        """ウィンドウ設定を保存"""
+        config.set("window.width", self.width())
+        config.set("window.height", self.height())
+    
+    def closeEvent(self, event):
+        """ウィンドウを閉じる時の処理"""
+        self.save_window_settings()
+        event.accept()
+
+    def export_html(self):
+        """HTMLとしてエクスポート"""
+        from .dialogs import ExportDialog
+        from .exporters import HTMLExporter
+        
+        # エクスポート設定ダイアログを表示
+        dialog = ExportDialog(self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        
+        options = dialog.get_options()
+        
+        # 表紙データを追加
+        cover_data = self.cover_editor.get_cover_data()
+        options.update(cover_data)
+        
+        # 保存先を選択
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "HTMLとしてエクスポート",
+            str(Path.home() / f"{self.current_project.title}.html"),
+            "HTML Files (*.html);;All Files (*)"
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            # エディタの内容をプロジェクトに保存
+            for i, editor in enumerate(self.problem_editors):
+                if i < len(self.current_project.problems):
+                    self.current_project.problems[i].content = editor.get_text()
+            
+            # 表紙データをプロジェクトに保存
+            self.current_project.cover_content = str(cover_data)
+            
+            # HTMLエクスポート
+            exporter = HTMLExporter()
+            exporter.export(self.current_project, Path(file_path), options)
+            
+            self.statusBar().showMessage(f"HTMLファイルを出力しました: {Path(file_path).name}")
+            
+            # 確認ダイアログ
+            reply = QMessageBox.question(
+                self, "エクスポート完了",
+                "HTMLファイルを出力しました。\n開きますか？",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            
+            if reply == QMessageBox.Yes:
+                import webbrowser
+                webbrowser.open(file_path)
+        
+        except Exception as e:
+            QMessageBox.critical(
+                self, "エラー",
+                f"エクスポートに失敗しました:\n{str(e)}"
+            )
+        
+        except Exception as e:
+            QMessageBox.critical(
+                self, "エラー",
+                f"エクスポートに失敗しました:\n{str(e)}"
+            )
