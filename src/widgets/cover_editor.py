@@ -155,3 +155,39 @@ class CoverEditor(QWidget):
         self.time_limit_edit.setText(data.get('time_limit', ''))
         self.total_score_edit.setText(data.get('total_score', ''))
         self.notes_edit.setPlainText(data.get('notes', ''))
+    
+    def undo(self):
+        """元に戻す（注意事項欄のみ）"""
+        # QLineEditにはUNDO機能があるが、フォーカスが必要
+        # 現在フォーカスされているウィジェットでUNDOを実行
+        focused_widget = self.focusWidget()
+        if isinstance(focused_widget, QLineEdit):
+            focused_widget.undo()
+        elif isinstance(focused_widget, QTextEdit):
+            focused_widget.undo()
+    
+    def redo(self):
+        """やり直す"""
+        focused_widget = self.focusWidget()
+        if isinstance(focused_widget, QLineEdit):
+            focused_widget.redo()
+        elif isinstance(focused_widget, QTextEdit):
+            focused_widget.redo()
+    
+    def can_undo(self) -> bool:
+        """元に戻すが可能か"""
+        focused_widget = self.focusWidget()
+        if isinstance(focused_widget, QLineEdit):
+            return focused_widget.isUndoAvailable()
+        elif isinstance(focused_widget, QTextEdit):
+            return focused_widget.document().isUndoAvailable()
+        return False
+    
+    def can_redo(self) -> bool:
+        """やり直すが可能か"""
+        focused_widget = self.focusWidget()
+        if isinstance(focused_widget, QLineEdit):
+            return focused_widget.isRedoAvailable()
+        elif isinstance(focused_widget, QTextEdit):
+            return focused_widget.document().isRedoAvailable()
+        return False

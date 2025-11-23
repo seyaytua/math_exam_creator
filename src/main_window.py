@@ -85,26 +85,33 @@ class MainWindow(QMainWindow):
         # 編集メニュー
         edit_menu = menubar.addMenu("編集(&E)")
         
-        undo_action = QAction("元に戻す(&U)", self)
-        undo_action.setShortcut(QKeySequence.Undo)
-        edit_menu.addAction(undo_action)
+        self.undo_action = QAction("元に戻す(&U)", self)
+        self.undo_action.setShortcut(QKeySequence.Undo)
+        self.undo_action.triggered.connect(self.undo)
+        self.undo_action.setEnabled(False)
+        edit_menu.addAction(self.undo_action)
         
-        redo_action = QAction("やり直し(&R)", self)
-        redo_action.setShortcut(QKeySequence.Redo)
-        edit_menu.addAction(redo_action)
+        self.redo_action = QAction("やり直し(&R)", self)
+        self.redo_action.setShortcut(QKeySequence.Redo)
+        self.redo_action.triggered.connect(self.redo)
+        self.redo_action.setEnabled(False)
+        edit_menu.addAction(self.redo_action)
         
         edit_menu.addSeparator()
         
         cut_action = QAction("切り取り(&T)", self)
         cut_action.setShortcut(QKeySequence.Cut)
+        cut_action.triggered.connect(self.cut)
         edit_menu.addAction(cut_action)
         
         copy_action = QAction("コピー(&C)", self)
         copy_action.setShortcut(QKeySequence.Copy)
+        copy_action.triggered.connect(self.copy)
         edit_menu.addAction(copy_action)
         
         paste_action = QAction("貼り付け(&P)", self)
         paste_action.setShortcut(QKeySequence.Paste)
+        paste_action.triggered.connect(self.paste)
         edit_menu.addAction(paste_action)
         
         # 挿入メニュー
@@ -200,6 +207,21 @@ class MainWindow(QMainWindow):
         
         toolbar.addSeparator()
         
+        # UNDO/REDOボタン
+        self.undo_toolbar_action = QAction("↶ 元に戻す", self)
+        self.undo_toolbar_action.triggered.connect(self.undo)
+        self.undo_toolbar_action.setEnabled(False)
+        self.undo_toolbar_action.setToolTip("元に戻す (Ctrl+Z)")
+        toolbar.addAction(self.undo_toolbar_action)
+        
+        self.redo_toolbar_action = QAction("↷ やり直し", self)
+        self.redo_toolbar_action.triggered.connect(self.redo)
+        self.redo_toolbar_action.setEnabled(False)
+        self.redo_toolbar_action.setToolTip("やり直し (Ctrl+Y)")
+        toolbar.addAction(self.redo_toolbar_action)
+        
+        toolbar.addSeparator()
+        
         add_problem_action = QAction("新しい問題", self)
         add_problem_action.triggered.connect(self.add_problem_tab)
         toolbar.addAction(add_problem_action)
@@ -239,6 +261,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.setMovable(True)  # タブの並び替えを有効化
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
         self.tab_widget.tabBar().tabMoved.connect(self.on_tab_moved)
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
         
         self.add_cover_tab()
         self.add_problem_tab()
@@ -253,12 +276,16 @@ class MainWindow(QMainWindow):
         self.cover_editor.content_changed.connect(
             lambda: self.statusBar().showMessage("表紙が変更されました")
         )
+        self.cover_editor.content_changed.connect(self.update_undo_redo_actions)
         self.tab_widget.addTab(self.cover_editor, "表紙")
     
     def add_problem_tab(self):
         """問題タブを追加"""
         problem_editor = ProblemEditor()
         self.problem_editors.append(problem_editor)
+        
+        # テキスト変更シグナルをUNDO/REDO更新に接続
+        problem_editor.text_changed.connect(self.update_undo_redo_actions)
         
         problem_number = len(self.problem_editors)
         self.tab_widget.addTab(problem_editor, f"問題 {problem_number}")
@@ -304,6 +331,10 @@ class MainWindow(QMainWindow):
         
         self._update_tab_titles()
         self.statusBar().showMessage("問題の順序を変更しました")
+    
+    def on_tab_changed(self, index: int):
+        """タブが切り替わったときの処理"""
+        self.update_undo_redo_actions()
     
     def _update_tab_titles(self):
         """タブのタイトルを更新"""
@@ -735,7 +766,91 @@ class MainWindow(QMainWindow):
     
     def open_print_settings(self):
         """印刷設定を開く"""
-        QMessageBox.information(self, "印刷設定", "印刷設定は実装予定です")
+        from .dialogs import PrintSettingsDialog
+        
+        dialog = PrintSettingsDialog(self)
+        dialog.print_requested.connect(self.handle_print_request)
+        dialog.exec()
+    
+    def handle_print_request(self, settings: dict):
+        """印刷リクエストを処理"""
+        action = settings.get('action')
+        
+        if action == 'preview':
+            QMessageBox.information(
+                self,
+                "印刷プレビュー",
+                "印刷プレビュー機能は今後のバージョンで実装予定です。\n\n"
+                "現在は「ファイル」→「エクスポート」からHTMLまたはPDFを出力できます。"
+            )
+        elif action == 'print':
+            QMessageBox.information(
+                self,
+                "印刷",
+                "印刷機能は今後のバージョンで実装予定です。\n\n"
+                "現在は「ファイル」→「エクスポート」からPDFを出力して印刷してください。"
+            )
+    
+    def undo(self):
+        """元に戻す"""
+        current_widget = self.tab_widget.currentWidget()
+        if current_widget and hasattr(current_widget, 'undo'):
+            current_widget.undo()
+            self.update_undo_redo_actions()
+    
+    def redo(self):
+        """やり直す"""
+        current_widget = self.tab_widget.currentWidget()
+        if current_widget and hasattr(current_widget, 'redo'):
+            current_widget.redo()
+            self.update_undo_redo_actions()
+    
+    def cut(self):
+        """切り取り"""
+        current_widget = self.tab_widget.currentWidget()
+        if isinstance(current_widget, ProblemEditor):
+            current_widget.text_editor.cut()
+        elif hasattr(current_widget, 'focusWidget'):
+            focused = current_widget.focusWidget()
+            if hasattr(focused, 'cut'):
+                focused.cut()
+    
+    def copy(self):
+        """コピー"""
+        current_widget = self.tab_widget.currentWidget()
+        if isinstance(current_widget, ProblemEditor):
+            current_widget.text_editor.copy()
+        elif hasattr(current_widget, 'focusWidget'):
+            focused = current_widget.focusWidget()
+            if hasattr(focused, 'copy'):
+                focused.copy()
+    
+    def paste(self):
+        """貼り付け"""
+        current_widget = self.tab_widget.currentWidget()
+        if isinstance(current_widget, ProblemEditor):
+            current_widget.text_editor.paste()
+        elif hasattr(current_widget, 'focusWidget'):
+            focused = current_widget.focusWidget()
+            if hasattr(focused, 'paste'):
+                focused.paste()
+    
+    def update_undo_redo_actions(self):
+        """UNDO/REDOアクションの有効/無効を更新"""
+        current_widget = self.tab_widget.currentWidget()
+        
+        can_undo = False
+        can_redo = False
+        
+        if current_widget and hasattr(current_widget, 'can_undo'):
+            can_undo = current_widget.can_undo()
+        if current_widget and hasattr(current_widget, 'can_redo'):
+            can_redo = current_widget.can_redo()
+        
+        self.undo_action.setEnabled(can_undo)
+        self.redo_action.setEnabled(can_redo)
+        self.undo_toolbar_action.setEnabled(can_undo)
+        self.redo_toolbar_action.setEnabled(can_redo)
     
     def open_usage_window(self):
         """使い方ウィンドウを開く"""
