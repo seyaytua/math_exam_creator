@@ -88,11 +88,16 @@ xattr -cr "Math Exam Creator.app"
 
 **PDF出力が使えない**
 
-WeasyPrintの依存関係をインストール：
+WeasyPrintとその依存関係をビルド前にインストール：
 ```bash
+# Cairo と関連ライブラリをインストール
 brew install cairo pango gdk-pixbuf libffi
-pip install weasyprint
+
+# 再ビルド
+./build_macos.sh
 ```
+
+**重要**: build.specはHomebrewのCairoライブラリを自動的に検出してバンドルします。ビルド前に必ずインストールしてください。
 
 ### Windows
 
@@ -134,10 +139,17 @@ pip install weasyprint
 
 **PDF出力が使えない**
 
-xhtml2pdfがインストールされていることを確認：
-```cmd
-pip install xhtml2pdf
-```
+WeasyPrintにはGTK+ Runtime for Windowsが必要です：
+
+1. [GTK+ Runtime for Windows](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases)をダウンロード
+2. インストーラーを実行
+3. システムを再起動
+4. 再ビルド：
+   ```cmd
+   build_windows.bat
+   ```
+
+**重要**: GTK+ランタイムをインストールしないと、ビルドされた実行ファイルでPDF出力が動作しません。
 
 ### Linux
 
@@ -173,9 +185,11 @@ pip install xhtml2pdf
    source venv/bin/activate
    pip install --upgrade pip
    pip install -r requirements.txt
-   pip install pyinstaller weasyprint
+   pip install pyinstaller
    pyinstaller build.spec --clean
    ```
+   
+   **注意**: WeasyPrintは requirements.txt に含まれています。
 
 4. **ビルド結果**
    - 実行ファイル: `dist/MathExamCreator/MathExamCreator`
@@ -266,6 +280,105 @@ upx=False
    - GitHub Releaseを作成
    - ビルドファイルを添付
    - リリースノートを自動生成
+
+## WeasyPrintのビルド設定
+
+Math Exam CreatorはPDF出力にWeasyPrintを使用しています。以下の設定により、実行ファイルにWeasyPrintが含まれます。
+
+### build.spec の設定
+
+#### 隠しインポート
+
+```python
+hiddenimports = [
+    # ... その他のインポート ...
+    # WeasyPrint関連
+    'weasyprint',
+    'weasyprint.css',
+    'weasyprint.html',
+    'weasyprint.layout',
+    'weasyprint.pdf',
+    'cairocffi',
+    'cairosvg',
+    'cffi',
+    'cssselect2',
+    'tinycss2',
+    'pyphen',
+    'fonttools',
+]
+```
+
+#### バイナリとデータファイル
+
+- **macOS**: Homebrewのcairoライブラリ（`/opt/homebrew/lib` または `/usr/local/lib`）を自動検出
+- **Windows**: GTK+ランタイムが必要
+- **Linux**: システムのcairoライブラリを使用
+
+#### カスタムhooks
+
+プロジェクトの `hooks/` ディレクトリに以下のファイルがあります：
+
+- `hook-weasyprint.py`: WeasyPrintのすべてのサブモジュールを収集
+- `hook-cairocffi.py`: cairocffiの動的ライブラリを収集
+- `hook-pyphen.py`: pyphenの辞書ファイルを収集
+
+### プラットフォーム別の注意事項
+
+#### macOS
+
+Homebrewでcairoをインストール：
+```bash
+brew install cairo pango gdk-pixbuf libffi
+```
+
+build.specは自動的に以下のライブラリを検出してバンドルします：
+- `libcairo.2.dylib`
+- `libpango-1.0.dylib`
+- `libpangocairo-1.0.dylib`
+
+#### Windows
+
+GTK+ Runtime for Windowsが必要です：
+
+1. [リリースページ](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases)から最新版をダウンロード
+2. インストーラーを実行（デフォルト設定で可）
+3. システム環境変数 `PATH` にGTK+のbinディレクトリが追加されることを確認
+
+**重要**: GTK+がインストールされていないと、ビルドは成功しますがPDF出力機能が動作しません。
+
+#### Linux
+
+システムのパッケージマネージャーでインストール：
+```bash
+sudo apt-get install libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0
+```
+
+### トラブルシューティング
+
+#### PDF出力時に「cairo library not found」エラー
+
+**macOS**:
+```bash
+brew install cairo
+# 再ビルド
+./build_macos.sh
+```
+
+**Windows**:
+GTK+ Runtimeを再インストールし、環境変数を確認してください。
+
+**Linux**:
+```bash
+sudo apt-get install --reinstall libcairo2
+```
+
+#### ビルドサイズが大きい
+
+WeasyPrintとその依存関係は約50MBを追加します。これは高品質なPDF出力に必要です。
+
+サイズを削減したい場合は、`build.spec`から以下を削除できますが、PDF出力機能が使えなくなります：
+- `weasyprint` 関連のhiddenimports
+- `cairocffi`, `cairosvg` のインポート
 
 ## サポート
 

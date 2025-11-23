@@ -29,6 +29,7 @@ hiddenimports = [
     'PySide6.QtWidgets',
     'PySide6.QtWebEngineWidgets',
     'PySide6.QtWebEngineCore',
+    'PySide6.QtPrintSupport',  # 印刷機能用
     'markdown',
     'markdown.extensions',
     'markdown.extensions.extra',
@@ -38,37 +39,83 @@ hiddenimports = [
     'pymdownx',
     'pymdownx.superfences',
     'pymdownx.arithmatex',
+    # WeasyPrint関連
+    'weasyprint',
+    'weasyprint.css',
+    'weasyprint.css.counters',
+    'weasyprint.css.media_queries',
+    'weasyprint.css.style_for',
+    'weasyprint.css.targets',
+    'weasyprint.html',
+    'weasyprint.layout',
+    'weasyprint.pdf',
+    'weasyprint.text',
+    'cairocffi',
+    'cairosvg',
+    'cffi',
+    'cssselect2',
+    'tinycss2',
+    'pyphen',
+    'fonttools',
+    'fonttools.ttLib',
 ]
+
+# WeasyPrintのバイナリとデータを収集
+binaries = []
+weasyprint_datas = []
+
+try:
+    import weasyprint
+    import cairocffi
+    import pyphen
+    
+    # Pyphenの辞書データを追加
+    pyphen_path = Path(pyphen.__file__).parent
+    if (pyphen_path / 'dictionaries').exists():
+        weasyprint_datas.append((str(pyphen_path / 'dictionaries'), 'pyphen/dictionaries'))
+except ImportError:
+    pass
 
 # プラットフォーム別の設定
 if sys.platform == 'darwin':
     # macOS
-    hiddenimports.extend([
-        'weasyprint',
-        'cairocffi',
-        'cairosvg',
-    ])
+    try:
+        # Cairoライブラリのパスを追加
+        import cairocffi
+        cairo_lib_path = cairocffi.__path__[0]
+        # macOSのCairoバイナリを探す
+        for lib_path in ['/opt/homebrew/lib', '/usr/local/lib']:
+            lib_path = Path(lib_path)
+            if lib_path.exists():
+                for lib_file in ['libcairo.2.dylib', 'libpango-1.0.dylib', 'libpangocairo-1.0.dylib']:
+                    full_path = lib_path / lib_file
+                    if full_path.exists():
+                        binaries.append((str(full_path), '.'))
+    except:
+        pass
+    
     icon_file = 'resources/icon.icns' if Path('resources/icon.icns').exists() else None
+
 elif sys.platform == 'win32':
     # Windows
-    hiddenimports.extend([
-        'xhtml2pdf',
-    ])
+    # WindowsではGTK+ランタイムが必要
+    # GTK3-Runtime for Windows をインストールする必要がある
     icon_file = 'resources/icon.ico' if Path('resources/icon.ico').exists() else None
+    
 else:
     # Linux
-    hiddenimports.extend([
-        'weasyprint',
-    ])
     icon_file = None
+
+# データファイルにweasyprintのデータを追加
+datas.extend(weasyprint_datas)
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=['hooks'],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
