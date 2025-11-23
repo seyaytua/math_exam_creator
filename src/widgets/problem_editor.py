@@ -376,3 +376,19 @@ class ProblemEditor(QWidget):
                 cursor = self.text_editor.textCursor()
                 cursor.insertText("\n" + image_markdown + "\n")
                 self.text_editor.setFocus()
+    
+    def undo(self):
+        """元に戻す"""
+        self.text_editor.undo()
+    
+    def redo(self):
+        """やり直す"""
+        self.text_editor.redo()
+    
+    def can_undo(self) -> bool:
+        """元に戻すが可能か"""
+        return self.text_editor.document().isUndoAvailable()
+    
+    def can_redo(self) -> bool:
+        """やり直すが可能か"""
+        return self.text_editor.document().isRedoAvailable()
