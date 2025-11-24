@@ -8,6 +8,7 @@ from .external_scripts_dialog import ExternalScriptsDialog
 from .script_output_dialog import ScriptOutputDialog
 from .math_editor_dialog import MathEditorDialog
 from .print_settings_dialog import PrintSettingsDialog
+from .print_preview_dialog import PrintPreviewDialog
 
 __all__ = [
     'ExportDialog',
@@ -16,5 +17,6 @@ __all__ = [
     'ExternalScriptsDialog',
     'ScriptOutputDialog',
     'MathEditorDialog',
-    'PrintSettingsDialog'
+    'PrintSettingsDialog',
+    'PrintPreviewDialog'
 ]
