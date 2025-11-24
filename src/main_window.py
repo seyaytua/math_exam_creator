@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """メインウィンドウ"""
 
 from PySide6.QtWidgets import (
@@ -565,58 +564,63 @@ class MainWindow(QMainWindow):
             
             if not tools_menu:
                 return
-        except RuntimeError:
-            # メニューがまだ作成されていない場合
-            return
-        
-        # 既存の外部スクリプト実行メニューを削除
-        for action in tools_menu.actions():
-            if hasattr(action, 'script_data'):
-                tools_menu.removeAction(action)
-        
-        # 設定から外部スクリプトを読み込み
-        from .config import config
-        scripts = []
-        for i in range(3):
-            script_config = config.get(f'external_scripts.script{i+1}', {})
-            if script_config.get('name') and script_config.get('script_path'):
-                scripts.append({
-                    'number': i + 1,
-                    'name': script_config.get('name'),
-                    'description': script_config.get('description', ''),
-                    'python_path': script_config.get('python_path'),
-                    'script_path': script_config.get('script_path')
-                })
-        
-        # 外部スクリプトメニューを追加
-        if scripts:
-            # プロンプト生成の後に区切り線があるので、その後に挿入
-            insert_after = None
+
+            # 既存の外部スクリプト実行メニューを削除
             for action in tools_menu.actions():
-                if action.text() == "プロンプト生成(&P)":
-                    insert_after = action
-                    break
+                if hasattr(action, 'script_data'):
+                    tools_menu.removeAction(action)
             
-            # セパレータの後に外部スクリプトメニューを追加
-            if insert_after:
-                actions = tools_menu.actions()
-                separator_index = actions.index(insert_after) + 1
+            # 設定から外部スクリプトを読み込み
+            from .config import config
+            scripts = []
+            for i in range(3):
+                script_config = config.get(f'external_scripts.script{i+1}', {})
+                if script_config.get('name') and script_config.get('script_path'):
+                    scripts.append({
+                        'number': i + 1,
+                        'name': script_config.get('name'),
+                        'description': script_config.get('description', ''),
+                        'python_path': script_config.get('python_path'),
+                        'script_path': script_config.get('script_path')
+                    })
+            
+            # 外部スクリプトメニューを追加
+            if scripts:
+                # プロンプト生成の後に区切り線があるので、その後に挿入
+                insert_after = None
+                for action in tools_menu.actions():
+                    if action.text() == "プロンプト生成(&P)":
+                        insert_after = action
+                        break
                 
-                for script in scripts:
-                    script_action = QAction(f"▶ {script['name']}", self)
-                    if script['description']:
-                        script_action.setToolTip(script['description'])
-                    script_action.script_data = script
-                    # クロージャの問題を避けるため、デフォルト引数で値を固定
-                    script_action.triggered.connect(
-                        lambda checked=False, s=dict(script): self.execute_external_script(s)
-                    )
-                    
-                    # セパレータの後に挿入
-                    if separator_index < len(actions):
-                        tools_menu.insertAction(actions[separator_index], script_action)
-                    else:
-                        tools_menu.addAction(script_action)
+                # セパレータの後に外部スクリプトメニューを追加
+                if insert_after:
+                    actions = tools_menu.actions()
+                    try:
+                        separator_index = actions.index(insert_after) + 1
+                        
+                        for script in scripts:
+                            script_action = QAction(f"▶ {script['name']}", self)
+                            if script['description']:
+                                script_action.setToolTip(script['description'])
+                            script_action.script_data = script
+                            # クロージャの問題を避けるため、デフォルト引数で値を固定
+                            script_action.triggered.connect(
+                                lambda checked=False, s=dict(script): self.execute_external_script(s)
+                            )
+                            
+                            # セパレータの後に挿入
+                            if separator_index < len(actions):
+                                tools_menu.insertAction(actions[separator_index], script_action)
+                            else:
+                                tools_menu.addAction(script_action)
+                    except ValueError:
+                        # insert_afterが見つからない場合は末尾に追加
+                        pass
+
+        except RuntimeError:
+            # メニューが削除されている、または作成されていない場合は無視する
+            return
     
     def update_script_button_menu(self):
         """ツールバーのスクリプトボタンメニューを更新"""
@@ -629,50 +633,51 @@ class MainWindow(QMainWindow):
             
             # 既存のメニュー項目をクリア
             self.script_menu.clear()
-        except RuntimeError:
-            # メニューがまだ作成されていない場合
-            return
-        
-        # 設定から外部スクリプトを読み込み
-        from .config import config
-        scripts = []
-        for i in range(3):
-            script_config = config.get(f'external_scripts.script{i+1}', {})
-            if script_config.get('name') and script_config.get('script_path'):
-                scripts.append({
-                    'number': i + 1,
-                    'name': script_config.get('name'),
-                    'description': script_config.get('description', ''),
-                    'python_path': script_config.get('python_path'),
-                    'script_path': script_config.get('script_path')
-                })
-        
-        # スクリプトが登録されている場合
-        if scripts:
-            for script in scripts:
-                script_action = QAction(f"{script['name']}", self)
-                if script['description']:
-                    script_action.setToolTip(script['description'])
-                # クロージャの問題を避けるため、デフォルト引数で値を固定
-                script_action.triggered.connect(
-                    lambda checked=False, s=dict(script): self.execute_external_script(s)
-                )
-                self.script_menu.addAction(script_action)
             
-            self.script_menu.addSeparator()
-        
-        # 「スクリプト設定」メニュー項目を追加
-        settings_action = QAction("スクリプト設定...", self)
-        settings_action.triggered.connect(self.open_external_scripts_settings)
-        self.script_menu.addAction(settings_action)
-        
-        # スクリプトがない場合はボタンを無効化
-        if not scripts:
-            # デフォルトメッセージを表示
-            no_scripts_action = QAction("（スクリプト未登録）", self)
-            no_scripts_action.setEnabled(False)
-            self.script_menu.insertAction(settings_action, no_scripts_action)
-            self.script_menu.insertSeparator(settings_action)
+            # 設定から外部スクリプトを読み込み
+            from .config import config
+            scripts = []
+            for i in range(3):
+                script_config = config.get(f'external_scripts.script{i+1}', {})
+                if script_config.get('name') and script_config.get('script_path'):
+                    scripts.append({
+                        'number': i + 1,
+                        'name': script_config.get('name'),
+                        'description': script_config.get('description', ''),
+                        'python_path': script_config.get('python_path'),
+                        'script_path': script_config.get('script_path')
+                    })
+            
+            # スクリプトが登録されている場合
+            if scripts:
+                for script in scripts:
+                    script_action = QAction(f"{script['name']}", self)
+                    if script['description']:
+                        script_action.setToolTip(script['description'])
+                    # クロージャの問題を避けるため、デフォルト引数で値を固定
+                    script_action.triggered.connect(
+                        lambda checked=False, s=dict(script): self.execute_external_script(s)
+                    )
+                    self.script_menu.addAction(script_action)
+                
+                self.script_menu.addSeparator()
+            
+            # 「スクリプト設定」メニュー項目を追加
+            settings_action = QAction("スクリプト設定...", self)
+            settings_action.triggered.connect(self.open_external_scripts_settings)
+            self.script_menu.addAction(settings_action)
+            
+            # スクリプトがない場合はボタンを無効化
+            if not scripts:
+                # デフォルトメッセージを表示
+                no_scripts_action = QAction("（スクリプト未登録）", self)
+                no_scripts_action.setEnabled(False)
+                self.script_menu.insertAction(settings_action, no_scripts_action)
+                self.script_menu.insertSeparator(settings_action)
+
+        except RuntimeError:
+            # メニューが削除されている場合は無視
+            return
     
     def execute_external_script(self, script_data: dict):
         """外部スクリプトを実行
