@@ -777,19 +777,102 @@ class MainWindow(QMainWindow):
         action = settings.get('action')
         
         if action == 'preview':
-            QMessageBox.information(
-                self,
-                "印刷プレビュー",
-                "印刷プレビュー機能は今後のバージョンで実装予定です。\n\n"
-                "現在は「ファイル」→「エクスポート」からHTMLまたはPDFを出力できます。"
-            )
+            self.show_print_preview(settings)
         elif action == 'print':
-            QMessageBox.information(
+            # 直接印刷の場合もプレビューを経由
+            self.show_print_preview(settings)
+    
+    def show_print_preview(self, settings: dict):
+        """印刷プレビューを表示"""
+        if not self.current_project:
+            QMessageBox.warning(
                 self,
-                "印刷",
-                "印刷機能は今後のバージョンで実装予定です。\n\n"
-                "現在は「ファイル」→「エクスポート」からPDFを出力して印刷してください。"
+                "警告",
+                "プロジェクトが開かれていません。"
             )
+            return
+        
+        # 現在の編集内容を保存
+        self._save_current_state()
+        
+        # HTMLを生成
+        from ..exporters import HTMLExporter
+        from ..dialogs import PrintPreviewDialog
+        
+        try:
+            exporter = HTMLExporter()
+            
+            # 印刷設定をエクスポートオプションに変換
+            export_options = {
+                'show_cover': settings.get('print_cover', True),
+                'show_problem_numbers': True,
+                'generate_answer_sheet': settings.get('print_answer_sheet', False),
+                'page_size': self._convert_paper_size(settings.get('paper_size', 'A4 (210 x 297 mm)')),
+                'margin': f"{settings.get('margin_top', 15)}mm {settings.get('margin_right', 20)}mm "
+                         f"{settings.get('margin_bottom', 15)}mm {settings.get('margin_left', 20)}mm",
+            }
+            
+            # 表紙情報を設定
+            cover_data = self.cover_editor.get_cover_data()
+            export_options.update({
+                'exam_title': cover_data.get('title', self.current_project.title),
+                'exam_subtitle': cover_data.get('subtitle', ''),
+                'exam_date': cover_data.get('date', ''),
+                'school_name': cover_data.get('school', ''),
+                'grade': cover_data.get('grade', ''),
+                'subject': cover_data.get('subject', '数学'),
+                'time_limit': cover_data.get('time_limit', ''),
+                'total_score': cover_data.get('total_score', ''),
+                'notes': cover_data.get('notes', ''),
+            })
+            
+            html_content = exporter._generate_html(self.current_project, export_options)
+            
+            # PrintPreviewDialog用の設定を準備
+            preview_settings = {
+                'paper_size': self._convert_paper_size(settings.get('paper_size', 'A4 (210 x 297 mm)')),
+                'orientation': settings.get('orientation', 'portrait'),
+                'margin_left': settings.get('margin_left', 20),
+                'margin_top': settings.get('margin_top', 15),
+                'margin_right': settings.get('margin_right', 20),
+                'margin_bottom': settings.get('margin_bottom', 15),
+                'copies': settings.get('copies', 1),
+                'include_cover': settings.get('print_cover', True),
+                'include_problems': settings.get('print_problems', True),
+                'include_answer_sheet': settings.get('print_answer_sheet', False),
+                'show_page_numbers': settings.get('page_numbers', True),
+            }
+            
+            # プレビューダイアログを表示
+            preview_dialog = PrintPreviewDialog(
+                html_content,
+                preview_settings,
+                self
+            )
+            preview_dialog.exec()
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "エラー",
+                f"印刷プレビューの生成に失敗しました:\n{str(e)}"
+            )
+    
+    def _convert_paper_size(self, paper_size_text: str) -> str:
+        """用紙サイズテキストをCSS用に変換"""
+        if 'A4' in paper_size_text:
+            return 'A4'
+        elif 'A3' in paper_size_text:
+            return 'A3'
+        elif 'B4' in paper_size_text:
+            return 'B4'
+        elif 'B5' in paper_size_text:
+            return 'B5'
+        elif 'Letter' in paper_size_text:
+            return 'Letter'
+        elif 'Legal' in paper_size_text:
+            return 'Legal'
+        return 'A4'  # デフォルト
     
     def undo(self):
         """元に戻す"""
