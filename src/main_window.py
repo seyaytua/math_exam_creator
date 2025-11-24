@@ -114,6 +114,12 @@ class MainWindow(QMainWindow):
         paste_action.triggered.connect(self.paste)
         edit_menu.addAction(paste_action)
         
+        edit_menu.addSeparator()
+        
+        rename_project_action = QAction("プロジェクト名を変更(&N)...", self)
+        rename_project_action.triggered.connect(self.rename_project)
+        edit_menu.addAction(rename_project_action)
+        
         # 挿入メニュー
         insert_menu = menubar.addMenu("挿入(&I)")
         
@@ -262,6 +268,8 @@ class MainWindow(QMainWindow):
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
         self.tab_widget.tabBar().tabMoved.connect(self.on_tab_moved)
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
+        # タブダブルクリックで名称変更
+        self.tab_widget.tabBar().tabBarDoubleClicked.connect(self.rename_tab)
         
         self.add_cover_tab()
         self.add_problem_tab()
@@ -777,19 +785,106 @@ class MainWindow(QMainWindow):
         action = settings.get('action')
         
         if action == 'preview':
-            QMessageBox.information(
-                self,
-                "印刷プレビュー",
-                "印刷プレビュー機能は今後のバージョンで実装予定です。\n\n"
-                "現在は「ファイル」→「エクスポート」からHTMLまたはPDFを出力できます。"
-            )
+            self.show_print_preview(settings)
         elif action == 'print':
-            QMessageBox.information(
+            # 直接印刷の場合もプレビューを経由
+            self.show_print_preview(settings)
+    
+    def show_print_preview(self, settings: dict):
+        """印刷プレビューを表示"""
+        if not self.current_project:
+            QMessageBox.warning(
                 self,
-                "印刷",
-                "印刷機能は今後のバージョンで実装予定です。\n\n"
-                "現在は「ファイル」→「エクスポート」からPDFを出力して印刷してください。"
+                "警告",
+                "プロジェクトが開かれていません。"
             )
+            return
+        
+        # 現在の編集内容をプロジェクトに反映
+        for i, editor in enumerate(self.problem_editors):
+            if i < len(self.current_project.problems):
+                self.current_project.problems[i].content = editor.get_text()
+                self.current_project.problems[i].score = editor.get_score()
+                self.current_project.problems[i].problem_type = editor.get_problem_type()
+        
+        # HTMLを生成
+        from ..exporters import HTMLExporter
+        from ..dialogs import PrintPreviewDialog
+        
+        try:
+            exporter = HTMLExporter()
+            
+            # 印刷設定をエクスポートオプションに変換
+            export_options = {
+                'show_cover': settings.get('print_cover', True),
+                'show_problem_numbers': True,
+                'generate_answer_sheet': settings.get('print_answer_sheet', False),
+                'page_size': self._convert_paper_size(settings.get('paper_size', 'A4 (210 x 297 mm)')),
+                'margin': f"{settings.get('margin_top', 15)}mm {settings.get('margin_right', 20)}mm "
+                         f"{settings.get('margin_bottom', 15)}mm {settings.get('margin_left', 20)}mm",
+            }
+            
+            # 表紙情報を設定
+            cover_data = self.cover_editor.get_cover_data()
+            export_options.update({
+                'exam_title': cover_data.get('title', self.current_project.title),
+                'exam_subtitle': cover_data.get('subtitle', ''),
+                'exam_date': cover_data.get('date', ''),
+                'school_name': cover_data.get('school', ''),
+                'grade': cover_data.get('grade', ''),
+                'subject': cover_data.get('subject', '数学'),
+                'time_limit': cover_data.get('time_limit', ''),
+                'total_score': cover_data.get('total_score', ''),
+                'notes': cover_data.get('notes', ''),
+            })
+            
+            html_content = exporter._generate_html(self.current_project, export_options)
+            
+            # PrintPreviewDialog用の設定を準備
+            preview_settings = {
+                'paper_size': self._convert_paper_size(settings.get('paper_size', 'A4 (210 x 297 mm)')),
+                'orientation': settings.get('orientation', 'portrait'),
+                'margin_left': settings.get('margin_left', 20),
+                'margin_top': settings.get('margin_top', 15),
+                'margin_right': settings.get('margin_right', 20),
+                'margin_bottom': settings.get('margin_bottom', 15),
+                'copies': settings.get('copies', 1),
+                'include_cover': settings.get('print_cover', True),
+                'include_problems': settings.get('print_problems', True),
+                'include_answer_sheet': settings.get('print_answer_sheet', False),
+                'show_page_numbers': settings.get('page_numbers', True),
+            }
+            
+            # プレビューダイアログを表示
+            preview_dialog = PrintPreviewDialog(
+                html_content,
+                preview_settings,
+                self
+            )
+            preview_dialog.exec()
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "エラー",
+                f"印刷プレビューの生成に失敗しました:\n{str(e)}"
+            )
+    
+    def _convert_paper_size(self, paper_size_text: str) -> str:
+        """用紙サイズテキストをCSS用に変換"""
+        if 'A4' in paper_size_text:
+            return 'A4'
+        elif 'A3' in paper_size_text:
+            return 'A3'
+        elif 'B4' in paper_size_text:
+            return 'B4'
+        elif 'B5' in paper_size_text:
+            return 'B5'
+        elif 'Letter' in paper_size_text:
+            return 'Letter'
+        elif 'Legal' in paper_size_text:
+            return 'Legal'
+        return 'A4'  # デフォルト
     
     def undo(self):
         """元に戻す"""
@@ -834,6 +929,62 @@ class MainWindow(QMainWindow):
             focused = current_widget.focusWidget()
             if hasattr(focused, 'paste'):
                 focused.paste()
+    
+    def rename_project(self):
+        """プロジェクト名を変更"""
+        if not self.current_project:
+            QMessageBox.warning(
+                self,
+                "警告",
+                "プロジェクトが開かれていません。"
+            )
+            return
+        
+        from PySide6.QtWidgets import QInputDialog
+        
+        new_name, ok = QInputDialog.getText(
+            self,
+            "プロジェクト名を変更",
+            "新しいプロジェクト名を入力してください:",
+            text=self.current_project.title
+        )
+        
+        if ok and new_name.strip():
+            old_name = self.current_project.title
+            self.current_project.title = new_name.strip()
+            self.setWindowTitle(f"{new_name.strip()} - Math Exam Creator")
+            self.is_modified = True
+            self.update_title()
+            
+            QMessageBox.information(
+                self,
+                "プロジェクト名変更",
+                f"プロジェクト名を「{old_name}」から「{new_name.strip()}」に変更しました。"
+            )
+    
+    def rename_tab(self, index: int):
+        """タブ名を変更"""
+        if index < 0:
+            return
+        
+        # 表紙タブ（index=0）は名称変更不可
+        if index == 0:
+            return
+        
+        from PySide6.QtWidgets import QInputDialog
+        
+        current_name = self.tab_widget.tabText(index)
+        new_name, ok = QInputDialog.getText(
+            self,
+            "問題名を変更",
+            "新しい問題名を入力してください:",
+            text=current_name
+        )
+        
+        if ok and new_name.strip():
+            self.tab_widget.setTabText(index, new_name.strip())
+            self.is_modified = True
+            self.statusBar().showMessage(f"問題名を「{current_name}」から「{new_name.strip()}」に変更しました。")
     
     def update_undo_redo_actions(self):
         """UNDO/REDOアクションの有効/無効を更新"""
@@ -984,7 +1135,15 @@ class MainWindow(QMainWindow):
                 
                 if reply == QMessageBox.Yes:
                     import webbrowser
-                    webbrowser.open(str(file_path))
+                    import os
+                    # プラットフォーム固有のファイルオープン
+                    if os.name == 'nt':  # Windows
+                        os.startfile(file_path)
+                    elif os.name == 'posix':  # macOS/Linux
+                        import subprocess
+                        subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', file_path])
+                    else:
+                        webbrowser.open(f'file://{file_path}')
             else:
                 exporter = HTMLExporter()
                 exporter.export(self.current_project, Path(file_path), options)
@@ -999,7 +1158,15 @@ class MainWindow(QMainWindow):
                 
                 if reply == QMessageBox.Yes:
                     import webbrowser
-                    webbrowser.open(file_path)
+                    import os
+                    # プラットフォーム固有のファイルオープン
+                    if os.name == 'nt':  # Windows
+                        os.startfile(file_path)
+                    elif os.name == 'posix':  # macOS/Linux
+                        import subprocess
+                        subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', file_path])
+                    else:
+                        webbrowser.open(f'file://{file_path}')
         
         except ImportError as e:
             QMessageBox.warning(

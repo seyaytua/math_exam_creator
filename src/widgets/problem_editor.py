@@ -323,6 +323,37 @@ class ProblemEditor(QWidget):
             QTimer.singleShot(100, self._retypeset_mathjax)
         except Exception as e:
             print(f"プレビュー更新エラー: {e}")
+            import traceback
+            traceback.print_exc()
+            # エラーが発生してもプレースホルダーを表示
+            error_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {{
+            font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            padding: 20px;
+            color: #d32f2f;
+            background-color: #ffebee;
+        }}
+        pre {{
+            background-color: #fff;
+            padding: 10px;
+            border: 1px solid #e57373;
+            overflow-x: auto;
+        }}
+    </style>
+</head>
+<body>
+    <h3>プレビューエラー</h3>
+    <p>{str(e)}</p>
+    <pre>{traceback.format_exc()}</pre>
+</body>
+</html>
+"""
+            self.web_view.setHtml(error_html)
     
     def _retypeset_mathjax(self):
         """MathJaxの再処理"""
