@@ -49,17 +49,17 @@ class CoverEditor(QWidget):
         
         self.exam_title_edit = QLineEdit()
         self.exam_title_edit.setPlaceholderText("例: 第1回定期考査")
-        self.exam_title_edit.textChanged.connect(self.content_changed.emit)
+        self.exam_title_edit.textChanged.connect(lambda: self.content_changed.emit())
         basic_layout.addRow("試験名:", self.exam_title_edit)
         
         self.exam_subtitle_edit = QLineEdit()
         self.exam_subtitle_edit.setPlaceholderText("例: 中間試験")
-        self.exam_subtitle_edit.textChanged.connect(self.content_changed.emit)
+        self.exam_subtitle_edit.textChanged.connect(lambda: self.content_changed.emit())
         basic_layout.addRow("サブタイトル:", self.exam_subtitle_edit)
         
         self.subject_edit = QLineEdit()
         self.subject_edit.setText("数学")
-        self.subject_edit.textChanged.connect(self.content_changed.emit)
+        self.subject_edit.textChanged.connect(lambda: self.content_changed.emit())
         basic_layout.addRow("科目:", self.subject_edit)
         
         basic_group.setLayout(basic_layout)
@@ -72,12 +72,12 @@ class CoverEditor(QWidget):
         
         self.school_name_edit = QLineEdit()
         self.school_name_edit.setPlaceholderText("例: ○○高等学校")
-        self.school_name_edit.textChanged.connect(self.content_changed.emit)
+        self.school_name_edit.textChanged.connect(lambda: self.content_changed.emit())
         school_layout.addRow("学校名:", self.school_name_edit)
         
         self.grade_edit = QLineEdit()
         self.grade_edit.setPlaceholderText("例: 高校1年")
-        self.grade_edit.textChanged.connect(self.content_changed.emit)
+        self.grade_edit.textChanged.connect(lambda: self.content_changed.emit())
         school_layout.addRow("学年:", self.grade_edit)
         
         school_group.setLayout(school_layout)
@@ -90,17 +90,17 @@ class CoverEditor(QWidget):
         
         self.exam_date_edit = QLineEdit()
         self.exam_date_edit.setPlaceholderText("例: 2025年6月15日")
-        self.exam_date_edit.textChanged.connect(self.content_changed.emit)
+        self.exam_date_edit.textChanged.connect(lambda: self.content_changed.emit())
         exam_layout.addRow("実施日:", self.exam_date_edit)
         
         self.time_limit_edit = QLineEdit()
         self.time_limit_edit.setPlaceholderText("例: 50分")
-        self.time_limit_edit.textChanged.connect(self.content_changed.emit)
+        self.time_limit_edit.textChanged.connect(lambda: self.content_changed.emit())
         exam_layout.addRow("試験時間:", self.time_limit_edit)
         
         self.total_score_edit = QLineEdit()
         self.total_score_edit.setPlaceholderText("例: 100点")
-        self.total_score_edit.textChanged.connect(self.content_changed.emit)
+        self.total_score_edit.textChanged.connect(lambda: self.content_changed.emit())
         exam_layout.addRow("配点:", self.total_score_edit)
         
         exam_group.setLayout(exam_layout)
@@ -119,7 +119,7 @@ class CoverEditor(QWidget):
             "3. 定規・コンパスの使用可。"
         )
         self.notes_edit.setMaximumHeight(150)
-        self.notes_edit.textChanged.connect(self.content_changed.emit)
+        self.notes_edit.textChanged.connect(lambda: self.content_changed.emit())
         notes_layout.addWidget(self.notes_edit)
         
         notes_group.setLayout(notes_layout)

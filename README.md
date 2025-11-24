@@ -4,7 +4,7 @@
 
 ## バージョン
 
-**v1.4.0**
+**v1.5.1**
 
 ## 特徴
 
@@ -23,6 +23,9 @@
 - ✅ **数式エディタ**: ビジュアルLaTeXエディタで数式を簡単作成
 - ✅ **UNDO/REDO**: 元に戻す/やり直し機能 (Ctrl+Z / Ctrl+Y)
 - ✅ **印刷設定**: 詳細な印刷設定ダイアログ
+- ✅ **印刷プレビュー**: WebEngineベースの実際のプレビュー表示
+- ✅ **プロジェクト名変更**: 編集メニューから変更可能
+- ✅ **問題名変更**: タブダブルクリックで変更可能
 
 ## 対応環境
 
@@ -68,11 +71,13 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. PDF出力機能（オプション）
+### 3. PDF出力機能
 
-PDF出力を使用する場合は、以下のいずれかをインストール：
+PDF出力を使用するには、WeasyPrintをインストールします。
 
-#### 推奨: WeasyPrint（高品質PDF）
+**注意**: ビルド済み実行ファイルにはWeasyPrintが含まれています。開発モードで実行する場合のみ、以下の手順でインストールしてください。
+
+#### WeasyPrint のインストール（開発モード用）
 
 ```bash
 # macOS
@@ -80,7 +85,9 @@ brew install cairo pango gdk-pixbuf libffi
 pip install weasyprint
 
 # Windows
-# まず GTK+ をインストール（https://gtk.org/）
+# GTK+ Runtime for Windows が必要
+# https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases
+# インストール後:
 pip install weasyprint
 
 # Linux (Ubuntu/Debian)
@@ -88,11 +95,21 @@ sudo apt-get install libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2
 pip install weasyprint
 ```
 
-#### 代替: xhtml2pdf（軽量）
+#### ビルド時のWeasyPrint含有
 
-```bash
-pip install xhtml2pdf
-```
+このアプリケーションをPyInstallerでビルドする際、WeasyPrintとその依存ライブラリは自動的に実行ファイルに含まれます。
+
+**macOS**: 
+- Homebrewでインストールされたcairoライブラリが自動的に検出され、バンドルされます
+- 事前に `brew install cairo pango` を実行してください
+
+**Windows**:
+- GTK+ Runtime for Windows が必要です
+- ビルド前にシステムにインストールしてください
+
+**Linux**:
+- システムのcairoライブラリが使用されます
+- ビルド前に必要なライブラリをインストールしてください
 
 ## 使い方
 
