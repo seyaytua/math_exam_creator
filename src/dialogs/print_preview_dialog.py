@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """印刷プレビューダイアログ"""
 
 from PySide6.QtWidgets import (
@@ -6,7 +5,7 @@ from PySide6.QtWidgets import (
     QLabel, QComboBox, QSpinBox, QMessageBox
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtCore import Qt, QUrl, Signal, QTimer
+from PySide6.QtCore import Qt, QUrl, Signal, QTimer, QMarginsF
 from PySide6.QtGui import QPageLayout, QPageSize
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 from typing import Dict, Optional
@@ -90,18 +89,22 @@ class PrintPreviewDialog(QDialog):
                          if orientation == 'portrait' 
                          else QPageLayout.Orientation.Landscape)
         
-        # プリンター設定
-        page_layout = QPageLayout()
-        page_layout.setPageSize(QPageSize(page_size_id))
-        page_layout.setOrientation(qt_orientation)
-        
         # マージン (mm)
-        margins = QPageLayout.Margins()
-        margins.left = self.settings.get('margin_left', 20)
-        margins.top = self.settings.get('margin_top', 20)
-        margins.right = self.settings.get('margin_right', 20)
-        margins.bottom = self.settings.get('margin_bottom', 20)
-        page_layout.setMargins(margins, QPageLayout.Unit.Millimeter)
+        left = float(self.settings.get('margin_left', 20))
+        top = float(self.settings.get('margin_top', 20))
+        right = float(self.settings.get('margin_right', 20))
+        bottom = float(self.settings.get('margin_bottom', 20))
+        
+        margins = QMarginsF(left, top, right, bottom)
+        
+        # QPageLayoutを作成（コンストラクタで一括設定）
+        # 引数: PageSize, Orientation, Margins, Units(Millimeter)
+        page_layout = QPageLayout(
+            QPageSize(page_size_id),
+            qt_orientation,
+            margins,
+            QPageLayout.Unit.Millimeter
+        )
         
         self.printer.setPageLayout(page_layout)
     

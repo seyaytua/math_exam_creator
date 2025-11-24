@@ -74,7 +74,7 @@ class HTMLExporter:
                 <div class="student-info">
                     <table>
                         <tr>
-                            <td class="label">受験番号</td>
+                            <td class="label">組番号</td>
                             <td class="field"></td>
                         </tr>
                         <tr>

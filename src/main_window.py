@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """メインウィンドウ"""
 
 from PySide6.QtWidgets import (
@@ -10,6 +9,9 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QAction, QKeySequence
 from pathlib import Path
 import json
+import sys
+import os
+import subprocess
 
 from .config import config
 from .styles import Styles
@@ -113,6 +115,12 @@ class MainWindow(QMainWindow):
         paste_action.setShortcut(QKeySequence.Paste)
         paste_action.triggered.connect(self.paste)
         edit_menu.addAction(paste_action)
+        
+        edit_menu.addSeparator()
+        
+        rename_project_action = QAction("プロジェクト名を変更(&N)...", self)
+        rename_project_action.triggered.connect(self.rename_project)
+        edit_menu.addAction(rename_project_action)
         
         # 挿入メニュー
         insert_menu = menubar.addMenu("挿入(&I)")
@@ -262,6 +270,8 @@ class MainWindow(QMainWindow):
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
         self.tab_widget.tabBar().tabMoved.connect(self.on_tab_moved)
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
+        # タブダブルクリックで名称変更
+        self.tab_widget.tabBar().tabBarDoubleClicked.connect(self.rename_tab)
         
         self.add_cover_tab()
         self.add_problem_tab()
@@ -554,58 +564,63 @@ class MainWindow(QMainWindow):
             
             if not tools_menu:
                 return
-        except RuntimeError:
-            # メニューがまだ作成されていない場合
-            return
-        
-        # 既存の外部スクリプト実行メニューを削除
-        for action in tools_menu.actions():
-            if hasattr(action, 'script_data'):
-                tools_menu.removeAction(action)
-        
-        # 設定から外部スクリプトを読み込み
-        from .config import config
-        scripts = []
-        for i in range(3):
-            script_config = config.get(f'external_scripts.script{i+1}', {})
-            if script_config.get('name') and script_config.get('script_path'):
-                scripts.append({
-                    'number': i + 1,
-                    'name': script_config.get('name'),
-                    'description': script_config.get('description', ''),
-                    'python_path': script_config.get('python_path'),
-                    'script_path': script_config.get('script_path')
-                })
-        
-        # 外部スクリプトメニューを追加
-        if scripts:
-            # プロンプト生成の後に区切り線があるので、その後に挿入
-            insert_after = None
+
+            # 既存の外部スクリプト実行メニューを削除
             for action in tools_menu.actions():
-                if action.text() == "プロンプト生成(&P)":
-                    insert_after = action
-                    break
+                if hasattr(action, 'script_data'):
+                    tools_menu.removeAction(action)
             
-            # セパレータの後に外部スクリプトメニューを追加
-            if insert_after:
-                actions = tools_menu.actions()
-                separator_index = actions.index(insert_after) + 1
+            # 設定から外部スクリプトを読み込み
+            from .config import config
+            scripts = []
+            for i in range(3):
+                script_config = config.get(f'external_scripts.script{i+1}', {})
+                if script_config.get('name') and script_config.get('script_path'):
+                    scripts.append({
+                        'number': i + 1,
+                        'name': script_config.get('name'),
+                        'description': script_config.get('description', ''),
+                        'python_path': script_config.get('python_path'),
+                        'script_path': script_config.get('script_path')
+                    })
+            
+            # 外部スクリプトメニューを追加
+            if scripts:
+                # プロンプト生成の後に区切り線があるので、その後に挿入
+                insert_after = None
+                for action in tools_menu.actions():
+                    if action.text() == "プロンプト生成(&P)":
+                        insert_after = action
+                        break
                 
-                for script in scripts:
-                    script_action = QAction(f"▶ {script['name']}", self)
-                    if script['description']:
-                        script_action.setToolTip(script['description'])
-                    script_action.script_data = script
-                    # クロージャの問題を避けるため、デフォルト引数で値を固定
-                    script_action.triggered.connect(
-                        lambda checked=False, s=dict(script): self.execute_external_script(s)
-                    )
-                    
-                    # セパレータの後に挿入
-                    if separator_index < len(actions):
-                        tools_menu.insertAction(actions[separator_index], script_action)
-                    else:
-                        tools_menu.addAction(script_action)
+                # セパレータの後に外部スクリプトメニューを追加
+                if insert_after:
+                    actions = tools_menu.actions()
+                    try:
+                        separator_index = actions.index(insert_after) + 1
+                        
+                        for script in scripts:
+                            script_action = QAction(f"▶ {script['name']}", self)
+                            if script['description']:
+                                script_action.setToolTip(script['description'])
+                            script_action.script_data = script
+                            # クロージャの問題を避けるため、デフォルト引数で値を固定
+                            script_action.triggered.connect(
+                                lambda checked=False, s=dict(script): self.execute_external_script(s)
+                            )
+                            
+                            # セパレータの後に挿入
+                            if separator_index < len(actions):
+                                tools_menu.insertAction(actions[separator_index], script_action)
+                            else:
+                                tools_menu.addAction(script_action)
+                    except ValueError:
+                        # insert_afterが見つからない場合は末尾に追加
+                        pass
+
+        except RuntimeError:
+            # メニューが削除されている、または作成されていない場合は無視する
+            return
     
     def update_script_button_menu(self):
         """ツールバーのスクリプトボタンメニューを更新"""
@@ -618,50 +633,51 @@ class MainWindow(QMainWindow):
             
             # 既存のメニュー項目をクリア
             self.script_menu.clear()
-        except RuntimeError:
-            # メニューがまだ作成されていない場合
-            return
-        
-        # 設定から外部スクリプトを読み込み
-        from .config import config
-        scripts = []
-        for i in range(3):
-            script_config = config.get(f'external_scripts.script{i+1}', {})
-            if script_config.get('name') and script_config.get('script_path'):
-                scripts.append({
-                    'number': i + 1,
-                    'name': script_config.get('name'),
-                    'description': script_config.get('description', ''),
-                    'python_path': script_config.get('python_path'),
-                    'script_path': script_config.get('script_path')
-                })
-        
-        # スクリプトが登録されている場合
-        if scripts:
-            for script in scripts:
-                script_action = QAction(f"{script['name']}", self)
-                if script['description']:
-                    script_action.setToolTip(script['description'])
-                # クロージャの問題を避けるため、デフォルト引数で値を固定
-                script_action.triggered.connect(
-                    lambda checked=False, s=dict(script): self.execute_external_script(s)
-                )
-                self.script_menu.addAction(script_action)
             
-            self.script_menu.addSeparator()
-        
-        # 「スクリプト設定」メニュー項目を追加
-        settings_action = QAction("スクリプト設定...", self)
-        settings_action.triggered.connect(self.open_external_scripts_settings)
-        self.script_menu.addAction(settings_action)
-        
-        # スクリプトがない場合はボタンを無効化
-        if not scripts:
-            # デフォルトメッセージを表示
-            no_scripts_action = QAction("（スクリプト未登録）", self)
-            no_scripts_action.setEnabled(False)
-            self.script_menu.insertAction(settings_action, no_scripts_action)
-            self.script_menu.insertSeparator(settings_action)
+            # 設定から外部スクリプトを読み込み
+            from .config import config
+            scripts = []
+            for i in range(3):
+                script_config = config.get(f'external_scripts.script{i+1}', {})
+                if script_config.get('name') and script_config.get('script_path'):
+                    scripts.append({
+                        'number': i + 1,
+                        'name': script_config.get('name'),
+                        'description': script_config.get('description', ''),
+                        'python_path': script_config.get('python_path'),
+                        'script_path': script_config.get('script_path')
+                    })
+            
+            # スクリプトが登録されている場合
+            if scripts:
+                for script in scripts:
+                    script_action = QAction(f"{script['name']}", self)
+                    if script['description']:
+                        script_action.setToolTip(script['description'])
+                    # クロージャの問題を避けるため、デフォルト引数で値を固定
+                    script_action.triggered.connect(
+                        lambda checked=False, s=dict(script): self.execute_external_script(s)
+                    )
+                    self.script_menu.addAction(script_action)
+                
+                self.script_menu.addSeparator()
+            
+            # 「スクリプト設定」メニュー項目を追加
+            settings_action = QAction("スクリプト設定...", self)
+            settings_action.triggered.connect(self.open_external_scripts_settings)
+            self.script_menu.addAction(settings_action)
+            
+            # スクリプトがない場合はボタンを無効化
+            if not scripts:
+                # デフォルトメッセージを表示
+                no_scripts_action = QAction("（スクリプト未登録）", self)
+                no_scripts_action.setEnabled(False)
+                self.script_menu.insertAction(settings_action, no_scripts_action)
+                self.script_menu.insertSeparator(settings_action)
+
+        except RuntimeError:
+            # メニューが削除されている場合は無視
+            return
     
     def execute_external_script(self, script_data: dict):
         """外部スクリプトを実行
@@ -792,12 +808,16 @@ class MainWindow(QMainWindow):
             )
             return
         
-        # 現在の編集内容を保存
-        self._save_current_state()
+        # 現在の編集内容をプロジェクトに反映
+        for i, editor in enumerate(self.problem_editors):
+            if i < len(self.current_project.problems):
+                self.current_project.problems[i].content = editor.get_text()
+                self.current_project.problems[i].score = editor.get_score()
+                self.current_project.problems[i].problem_type = editor.get_problem_type()
         
         # HTMLを生成
-        from ..exporters import HTMLExporter
-        from ..dialogs import PrintPreviewDialog
+        from src.exporters import HTMLExporter
+        from src.dialogs import PrintPreviewDialog
         
         try:
             exporter = HTMLExporter()
@@ -917,6 +937,66 @@ class MainWindow(QMainWindow):
             focused = current_widget.focusWidget()
             if hasattr(focused, 'paste'):
                 focused.paste()
+    
+    def rename_project(self):
+        """プロジェクト名を変更"""
+        if not self.current_project:
+            QMessageBox.warning(
+                self,
+                "警告",
+                "プロジェクトが開かれていません。"
+            )
+            return
+        
+        from PySide6.QtWidgets import QInputDialog
+        
+        new_name, ok = QInputDialog.getText(
+            self,
+            "プロジェクト名を変更",
+            "新しいプロジェクト名を入力してください:",
+            text=self.current_project.title
+        )
+        
+        if ok and new_name.strip():
+            old_name = self.current_project.title
+            self.current_project.title = new_name.strip()
+            self.is_modified = True
+            # ウィンドウタイトルを更新
+            title = f"{new_name.strip()}"
+            if self.is_modified:
+                title += " *"
+            title += " - Math Exam Creator"
+            self.setWindowTitle(title)
+            
+            QMessageBox.information(
+                self,
+                "プロジェクト名変更",
+                f"プロジェクト名を「{old_name}」から「{new_name.strip()}」に変更しました。"
+            )
+    
+    def rename_tab(self, index: int):
+        """タブ名を変更"""
+        if index < 0:
+            return
+        
+        # 表紙タブ（index=0）は名称変更不可
+        if index == 0:
+            return
+        
+        from PySide6.QtWidgets import QInputDialog
+        
+        current_name = self.tab_widget.tabText(index)
+        new_name, ok = QInputDialog.getText(
+            self,
+            "問題名を変更",
+            "新しい問題名を入力してください:",
+            text=current_name
+        )
+        
+        if ok and new_name.strip():
+            self.tab_widget.setTabText(index, new_name.strip())
+            self.is_modified = True
+            self.statusBar().showMessage(f"問題名を「{current_name}」から「{new_name.strip()}」に変更しました。")
     
     def update_undo_redo_actions(self):
         """UNDO/REDOアクションの有効/無効を更新"""
@@ -1066,8 +1146,18 @@ class MainWindow(QMainWindow):
                 )
                 
                 if reply == QMessageBox.Yes:
-                    import webbrowser
-                    webbrowser.open(str(file_path))
+                    try:
+                        # プラットフォーム固有のファイルオープン
+                        if sys.platform == 'win32':  # Windows
+                            os.startfile(file_path)
+                        elif sys.platform == 'darwin':  # macOS
+                            subprocess.Popen(['open', file_path])
+                        else:  # Linux
+                            subprocess.Popen(['xdg-open', file_path])
+                    except Exception as e:
+                        # フォールバック: webbrowser
+                        import webbrowser
+                        webbrowser.open(f'file://{os.path.abspath(file_path)}')
             else:
                 exporter = HTMLExporter()
                 exporter.export(self.current_project, Path(file_path), options)
@@ -1081,8 +1171,18 @@ class MainWindow(QMainWindow):
                 )
                 
                 if reply == QMessageBox.Yes:
-                    import webbrowser
-                    webbrowser.open(file_path)
+                    try:
+                        # プラットフォーム固有のファイルオープン
+                        if sys.platform == 'win32':  # Windows
+                            os.startfile(file_path)
+                        elif sys.platform == 'darwin':  # macOS
+                            subprocess.Popen(['open', file_path])
+                        else:  # Linux
+                            subprocess.Popen(['xdg-open', file_path])
+                    except Exception as e:
+                        # フォールバック: webbrowser
+                        import webbrowser
+                        webbrowser.open(f'file://{os.path.abspath(file_path)}')
         
         except ImportError as e:
             QMessageBox.warning(

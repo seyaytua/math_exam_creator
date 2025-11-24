@@ -58,15 +58,18 @@ class ProblemEditor(QWidget):
         type_label.setStyleSheet("font-weight: bold;")
         settings_layout.addWidget(type_label)
         
+        self.none_radio = QRadioButton("なし")
+        self.none_radio.setChecked(True)
         self.required_radio = QRadioButton("必答問題")
-        self.required_radio.setChecked(True)
         self.optional_radio = QRadioButton("選択問題")
         
         self.type_button_group = QButtonGroup()
-        self.type_button_group.addButton(self.required_radio, 0)
-        self.type_button_group.addButton(self.optional_radio, 1)
+        self.type_button_group.addButton(self.none_radio, 0)
+        self.type_button_group.addButton(self.required_radio, 1)
+        self.type_button_group.addButton(self.optional_radio, 2)
         self.type_button_group.buttonClicked.connect(self._on_type_changed)
         
+        settings_layout.addWidget(self.none_radio)
         settings_layout.addWidget(self.required_radio)
         settings_layout.addWidget(self.optional_radio)
         settings_layout.addStretch()
@@ -294,10 +297,10 @@ class ProblemEditor(QWidget):
     
     def _save_scroll_position(self):
         """現在のスクロール位置を保存"""
-        self.web_view.page().runJavaScript(
-            "window.pageYOffset",
-            lambda result: setattr(self, 'scroll_position', result if result else 0)
-        )
+        def callback(result):
+            self.scroll_position = result if result else 0
+        
+        self.web_view.page().runJavaScript("window.pageYOffset", 0, callback)
     
     def _restore_scroll_position(self):
         """スクロール位置を復元"""
@@ -323,6 +326,37 @@ class ProblemEditor(QWidget):
             QTimer.singleShot(100, self._retypeset_mathjax)
         except Exception as e:
             print(f"プレビュー更新エラー: {e}")
+            import traceback
+            traceback.print_exc()
+            # エラーが発生してもプレースホルダーを表示
+            error_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {{
+            font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            padding: 20px;
+            color: #d32f2f;
+            background-color: #ffebee;
+        }}
+        pre {{
+            background-color: #fff;
+            padding: 10px;
+            border: 1px solid #e57373;
+            overflow-x: auto;
+        }}
+    </style>
+</head>
+<body>
+    <h3>プレビューエラー</h3>
+    <p>{str(e)}</p>
+    <pre>{traceback.format_exc()}</pre>
+</body>
+</html>
+"""
+            self.web_view.setHtml(error_html)
     
     def _retypeset_mathjax(self):
         """MathJaxの再処理"""
@@ -352,14 +386,21 @@ class ProblemEditor(QWidget):
     
     def get_problem_type(self) -> str:
         """問題タイプを取得"""
-        return "required" if self.required_radio.isChecked() else "optional"
+        if self.none_radio.isChecked():
+            return "none"
+        elif self.required_radio.isChecked():
+            return "required"
+        else:
+            return "optional"
     
     def set_problem_type(self, problem_type: str):
         """問題タイプを設定"""
         if problem_type == "optional":
             self.optional_radio.setChecked(True)
-        else:
+        elif problem_type == "required":
             self.required_radio.setChecked(True)
+        else:
+            self.none_radio.setChecked(True)
     
     def _on_type_changed(self):
         """問題タイプ変更時の処理"""
